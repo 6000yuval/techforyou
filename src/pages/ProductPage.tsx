@@ -358,7 +358,7 @@ const ProductPage: React.FC = () => {
           {/* Product Details Tabs */}
           <section className="mt-16" dir="rtl">
             <Tabs defaultValue="description" className="w-full" dir="rtl">
-              <TabsList className="w-full flex justify-end border-b rounded-none h-auto p-0 bg-transparent">
+              <TabsList className="w-full flex justify-start border-b rounded-none h-auto p-0 bg-transparent">
                 <TabsTrigger 
                   value="description" 
                   className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-4 text-lg"
