@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { ChevronLeft, SlidersHorizontal, X } from 'lucide-react';
+import { ChevronLeft, SlidersHorizontal } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import ProductGrid from '@/components/products/ProductGrid';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { getCategoryBySlug, getParentCategory, categories } from '@/data/categories';
+import { getCategoryBySlug, getParentCategory } from '@/data/categories';
 import { products } from '@/data/products';
 
 const CategoryPage: React.FC = () => {
@@ -20,27 +20,66 @@ const CategoryPage: React.FC = () => {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]);
   const [inStockOnly, setInStockOnly] = useState(false);
   const [onSaleOnly, setOnSaleOnly] = useState(false);
+  const [connectionType, setConnectionType] = useState<string[]>([]);
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
 
-  const categoryProducts = useMemo(() => {
-    let filtered = products.filter(p => {
+  // Get all products for this category
+  const baseCategoryProducts = useMemo(() => {
+    return products.filter(p => {
       if (parentCategory) {
-        // It's a subcategory - for now show all parent category products
         return p.category_id === parentCategory.id;
       }
       return p.category_id === category?.id;
     });
+  }, [category, parentCategory]);
 
-    // Apply filters
-    filtered = filtered.filter(p => {
+  // Extract available connection types from products
+  const availableConnectionTypes = useMemo(() => {
+    const types = new Set<string>();
+    baseCategoryProducts.forEach(p => {
+      const connAttr = p.attributes?.find(a => a.name === 'סוג חיבור');
+      connAttr?.values.forEach(v => types.add(v));
+    });
+    return Array.from(types);
+  }, [baseCategoryProducts]);
+
+  // Extract available colors from products
+  const availableColors = useMemo(() => {
+    const colors = new Set<string>();
+    baseCategoryProducts.forEach(p => {
+      const colorAttr = p.attributes?.find(a => a.name === 'צבע');
+      colorAttr?.values.forEach(v => colors.add(v));
+    });
+    return Array.from(colors);
+  }, [baseCategoryProducts]);
+
+  // Apply all filters
+  const categoryProducts = useMemo(() => {
+    return baseCategoryProducts.filter(p => {
       const price = p.sale_price || p.price;
       if (price < priceRange[0] || price > priceRange[1]) return false;
       if (inStockOnly && !p.in_stock) return false;
       if (onSaleOnly && (!p.sale_price || p.sale_price >= p.price)) return false;
+      
+      // Connection type filter
+      if (connectionType.length > 0) {
+        const connAttr = p.attributes?.find(a => a.name === 'סוג חיבור');
+        if (!connAttr || !connAttr.values.some(v => connectionType.includes(v))) {
+          return false;
+        }
+      }
+      
+      // Color filter
+      if (selectedColors.length > 0) {
+        const colorAttr = p.attributes?.find(a => a.name === 'צבע');
+        if (!colorAttr || !colorAttr.values.some(v => selectedColors.includes(v))) {
+          return false;
+        }
+      }
+      
       return true;
     });
-
-    return filtered;
-  }, [category, parentCategory, priceRange, inStockOnly, onSaleOnly]);
+  }, [baseCategoryProducts, priceRange, inStockOnly, onSaleOnly, connectionType, selectedColors]);
 
   if (!category) {
     return (
@@ -57,6 +96,22 @@ const CategoryPage: React.FC = () => {
 
   const displayCategory = parentCategory || category;
   const subcategories = displayCategory.subcategories || [];
+
+  const handleConnectionTypeChange = (type: string, checked: boolean) => {
+    if (checked) {
+      setConnectionType(prev => [...prev, type]);
+    } else {
+      setConnectionType(prev => prev.filter(t => t !== type));
+    }
+  };
+
+  const handleColorChange = (color: string, checked: boolean) => {
+    if (checked) {
+      setSelectedColors(prev => [...prev, color]);
+    } else {
+      setSelectedColors(prev => prev.filter(c => c !== color));
+    }
+  };
 
   const FilterContent = () => (
     <div className="space-y-6">
@@ -76,6 +131,48 @@ const CategoryPage: React.FC = () => {
           <span>₪{priceRange[1]}</span>
         </div>
       </div>
+
+      {/* Connection Type Filter */}
+      {availableConnectionTypes.length > 0 && (
+        <div>
+          <h4 className="font-medium text-foreground mb-3">סוג חיבור</h4>
+          <div className="space-y-2">
+            {availableConnectionTypes.map((type) => (
+              <div key={type} className="flex items-center gap-2">
+                <Checkbox
+                  id={`conn-${type}`}
+                  checked={connectionType.includes(type)}
+                  onCheckedChange={(checked) => handleConnectionTypeChange(type, checked as boolean)}
+                />
+                <Label htmlFor={`conn-${type}`} className="cursor-pointer">
+                  {type}
+                </Label>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Color Filter */}
+      {availableColors.length > 0 && (
+        <div>
+          <h4 className="font-medium text-foreground mb-3">צבע</h4>
+          <div className="space-y-2">
+            {availableColors.map((color) => (
+              <div key={color} className="flex items-center gap-2">
+                <Checkbox
+                  id={`color-${color}`}
+                  checked={selectedColors.includes(color)}
+                  onCheckedChange={(checked) => handleColorChange(color, checked as boolean)}
+                />
+                <Label htmlFor={`color-${color}`} className="cursor-pointer">
+                  {color}
+                </Label>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Stock Filter */}
       <div className="flex items-center gap-2">
