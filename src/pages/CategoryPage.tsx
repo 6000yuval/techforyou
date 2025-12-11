@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { getCategoryBySlug, getParentCategory } from '@/data/categories';
 import { products } from '@/data/products';
+import { productBelongsToSubcategory } from '@/utils/productSubcategoryMatcher';
 
 const CategoryPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -23,15 +24,19 @@ const CategoryPage: React.FC = () => {
   const [connectionType, setConnectionType] = useState<string[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
 
-  // Get all products for this category
+  // Get all products for this category or subcategory
   const baseCategoryProducts = useMemo(() => {
-    return products.filter(p => {
-      if (parentCategory) {
-        return p.category_id === parentCategory.id;
-      }
-      return p.category_id === category?.id;
-    });
-  }, [category, parentCategory]);
+    // If we're on a subcategory page
+    if (parentCategory) {
+      // Filter products that belong to the parent category AND match the subcategory
+      return products.filter(p => 
+        p.category_id === parentCategory.id && 
+        productBelongsToSubcategory(p, slug || '')
+      );
+    }
+    // If we're on a main category page, show all products from that category
+    return products.filter(p => p.category_id === category?.id);
+  }, [category, parentCategory, slug]);
 
   // Extract available connection types from products
   const availableConnectionTypes = useMemo(() => {
