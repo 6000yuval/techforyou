@@ -3,23 +3,23 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { categories } from '@/data/categories';
 
-// Category images mapping
+// Category images mapping - accurate images for each category
 const categoryImages: Record<string, string> = {
-  headphones: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=300&h=300&fit=crop',
-  microphones: 'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=300&h=300&fit=crop',
-  speakers: 'https://images.unsplash.com/photo-1545454675-3531b543be5d?w=300&h=300&fit=crop',
-  cameras: 'https://images.unsplash.com/photo-1587826080692-f439cd0b70da?w=300&h=300&fit=crop',
-  mice: 'https://images.unsplash.com/photo-1527814050087-3793815479db?w=300&h=300&fit=crop',
-  keyboards: 'https://images.unsplash.com/photo-1595225476474-87563907a212?w=300&h=300&fit=crop',
-  'computer-sets': 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=300&h=300&fit=crop',
-  cables: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&h=300&fit=crop',
-  adapters: 'https://images.unsplash.com/photo-1625723044792-44de16ccb4e9?w=300&h=300&fit=crop',
-  'hubs-docking': 'https://images.unsplash.com/photo-1625842268584-8f3296236761?w=300&h=300&fit=crop',
-  storage: 'https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=300&h=300&fit=crop',
-  network: 'https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=300&h=300&fit=crop',
-  'desk-setup': 'https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=300&h=300&fit=crop',
-  'power-charging': 'https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=300&h=300&fit=crop',
-  gaming: 'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=300&h=300&fit=crop',
+  headphones: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop', // אוזניות
+  microphones: 'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=400&h=400&fit=crop', // מיקרופונים
+  speakers: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&h=400&fit=crop', // רמקולים
+  cameras: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=400&h=400&fit=crop', // מצלמות
+  mice: 'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=400&h=400&fit=crop', // עכברים
+  keyboards: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=400&h=400&fit=crop', // מקלדות
+  'computer-sets': 'https://images.unsplash.com/photo-1593640408182-31c70c8268f5?w=400&h=400&fit=crop', // סטים למחשב
+  cables: 'https://images.unsplash.com/photo-1601944179066-29786cb9d32a?w=400&h=400&fit=crop', // כבלים
+  adapters: 'https://images.unsplash.com/photo-1625723044792-44de16ccb4e9?w=400&h=400&fit=crop', // מתאמים
+  'hubs-docking': 'https://images.unsplash.com/photo-1625842268584-8f3296236761?w=400&h=400&fit=crop', // Hubs ותחנות עגינה
+  storage: 'https://images.unsplash.com/photo-1531492746076-161ca9bcad58?w=400&h=400&fit=crop', // אחסון חיצוני - SSD/HDD
+  network: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=400&h=400&fit=crop', // רשת - רשת ונתבים
+  'desk-setup': 'https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=400&h=400&fit=crop', // ארגון שולחן
+  'power-charging': 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=400&h=400&fit=crop', // חשמל וטעינה - מטענים
+  gaming: 'https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=400&h=400&fit=crop', // גיימינג - בקרים וציוד גיימינג
 };
 
 const CategoryGrid: React.FC = () => {
