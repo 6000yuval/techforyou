@@ -19,14 +19,7 @@ const Index: React.FC = () => {
       
       <HeroSection />
       
-      <section className="py-12 bg-background">
-        <div className="container">
-          <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-8 text-center">
-            קטגוריות מובילות
-          </h2>
-          <CategoryGrid />
-        </div>
-      </section>
+      <CategoryGrid />
 
       {saleProducts.length > 0 && (
         <section className="py-12 bg-muted/30">
