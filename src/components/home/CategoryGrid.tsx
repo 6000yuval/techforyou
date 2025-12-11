@@ -24,10 +24,10 @@ const categoryImages: Record<string, string> = {
 
 const CategoryGrid: React.FC = () => {
   return (
-    <section className="py-12 bg-background">
+    <section id="categories-section" className="py-12 bg-background">
       <div className="container">
         <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-8 text-center">
-          קטגוריות מובילות
+          קטגוריות
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {categories.slice(0, 15).map((category) => {
