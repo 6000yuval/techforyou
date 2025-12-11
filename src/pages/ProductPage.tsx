@@ -356,9 +356,9 @@ const ProductPage: React.FC = () => {
           </div>
 
           {/* Product Details Tabs */}
-          <section className="mt-16">
-            <Tabs defaultValue="description" className="w-full">
-              <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent">
+          <section className="mt-16" dir="rtl">
+            <Tabs defaultValue="description" className="w-full" dir="rtl">
+              <TabsList className="w-full flex justify-end border-b rounded-none h-auto p-0 bg-transparent">
                 <TabsTrigger 
                   value="description" 
                   className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-4 text-lg"
@@ -379,17 +379,17 @@ const ProductPage: React.FC = () => {
                 </TabsTrigger>
               </TabsList>
               
-              <TabsContent value="description" className="mt-8">
+              <TabsContent value="description" className="mt-8 text-right">
                 <Card>
                   <CardContent className="p-8">
-                    <div className="prose prose-lg max-w-none text-muted-foreground whitespace-pre-line leading-relaxed">
+                    <div className="prose prose-lg max-w-none text-muted-foreground whitespace-pre-line leading-relaxed text-right">
                       {product.description || product.short_description}
                     </div>
                   </CardContent>
                 </Card>
               </TabsContent>
               
-              <TabsContent value="specs" className="mt-8">
+              <TabsContent value="specs" className="mt-8 text-right">
                 <Card>
                   <CardContent className="p-8">
                     <div className="grid md:grid-cols-2 gap-4">
