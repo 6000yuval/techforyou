@@ -109,24 +109,6 @@ export type Database = {
           },
         ]
       }
-      Categories: {
-        Row: {
-          id: string | null
-          name: string | null
-          slug: string | null
-        }
-        Insert: {
-          id?: string | null
-          name?: string | null
-          slug?: string | null
-        }
-        Update: {
-          id?: string | null
-          name?: string | null
-          slug?: string | null
-        }
-        Relationships: []
-      }
       coupons: {
         Row: {
           code: string
@@ -468,75 +450,6 @@ export type Database = {
           sku?: string | null
           stock_quantity?: number | null
           updated_at?: string | null
-        }
-        Relationships: []
-      }
-      Products: {
-        Row: {
-          description: string | null
-          id: string | null
-          price: number | null
-          primary_category_id: string | null
-          primary_subcategory_id: string | null
-          short_description: string | null
-          sku: string | null
-          status: string | null
-          supplier_id: number | null
-          title: string | null
-        }
-        Insert: {
-          description?: string | null
-          id?: string | null
-          price?: number | null
-          primary_category_id?: string | null
-          primary_subcategory_id?: string | null
-          short_description?: string | null
-          sku?: string | null
-          status?: string | null
-          supplier_id?: number | null
-          title?: string | null
-        }
-        Update: {
-          description?: string | null
-          id?: string | null
-          price?: number | null
-          primary_category_id?: string | null
-          primary_subcategory_id?: string | null
-          short_description?: string | null
-          sku?: string | null
-          status?: string | null
-          supplier_id?: number | null
-          title?: string | null
-        }
-        Relationships: []
-      }
-      "products categories": {
-        Row: {
-          category_id: string | null
-          product_id: string | null
-        }
-        Insert: {
-          category_id?: string | null
-          product_id?: string | null
-        }
-        Update: {
-          category_id?: string | null
-          product_id?: string | null
-        }
-        Relationships: []
-      }
-      "products subcategories": {
-        Row: {
-          product_id: string | null
-          subcategory_id: string | null
-        }
-        Insert: {
-          product_id?: string | null
-          subcategory_id?: string | null
-        }
-        Update: {
-          product_id?: string | null
-          subcategory_id?: string | null
         }
         Relationships: []
       }
