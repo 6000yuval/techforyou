@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { enhancedProducts } from '@/data/enhancedProducts';
+import { products } from '@/data/products';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -19,7 +19,6 @@ export default function ImportProducts() {
   useEffect(() => {
     const checkAuthorization = async () => {
       try {
-        // Check if user is authenticated
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         
         if (userError || !user) {
@@ -28,7 +27,6 @@ export default function ImportProducts() {
           return;
         }
 
-        // Check if user has admin role using the has_role function
         const { data: hasAdminRole, error: roleError } = await supabase.rpc('has_role', {
           _user_id: user.id,
           _role: 'admin'
@@ -56,7 +54,6 @@ export default function ImportProducts() {
     checkAuthorization();
   }, []);
 
-  // Show loading state while checking authorization
   if (isAuthorized === null) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center" dir="rtl">
@@ -68,7 +65,6 @@ export default function ImportProducts() {
     );
   }
 
-  // Show unauthorized message
   if (!isAuthorized) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center" dir="rtl">
@@ -90,59 +86,29 @@ export default function ImportProducts() {
     setResults({ success: 0, errors: [] });
     setCompleted(false);
 
-    const total = enhancedProducts.length;
+    const total = products.length;
     let successCount = 0;
     const errors: string[] = [];
 
-    for (let i = 0; i < enhancedProducts.length; i++) {
-      const product = enhancedProducts[i];
+    for (let i = 0; i < products.length; i++) {
+      const product = products[i];
       
       try {
-        // Create slug from title
-        const slug = product.id + '-' + product.title
-          .replace(/[^\u0590-\u05FFa-zA-Z0-9\s]/g, '')
-          .replace(/\s+/g, '-')
-          .toLowerCase()
-          .slice(0, 100);
-
-        // Map category names to IDs
-        const categoryMap: Record<string, string> = {
-          'אוזניות': 'headphones',
-          'מיקרופונים': 'microphones',
-          'רמקולים': 'speakers',
-          'מצלמות': 'cameras',
-          'עכברים': 'mice',
-          'מקלדות': 'keyboards',
-          'סטים למחשב': 'computer-sets',
-          'כבלים': 'cables',
-          'מתאמים': 'adapters',
-          'Hubs ותחנות עגינה': 'hubs-docking',
-          'אחסון חיצוני': 'storage',
-          'רשת': 'network',
-          'ארגון שולחן וסטאפ': 'desk-setup',
-          'חשמל וטעינה': 'power-charging',
-          'גיימינג': 'gaming',
-          'אביזרי מחשב': 'desk-setup',
-        };
-
-        const categoryId = categoryMap[product.category] || 'desk-setup';
-
         // Insert product
         const { error: productError } = await supabase
           .from('products')
           .upsert({
             id: product.id,
-            sku: product.sku,
-            name: product.title,
-            slug: slug,
+            name: product.name,
+            slug: product.slug,
             description: product.description,
-            short_description: product.shortDescription,
+            short_description: product.short_description,
             price: product.price,
-            compare_at_price: product.compareAtPrice || null,
-            category_id: categoryId,
+            compare_at_price: product.sale_price || null,
+            category_id: product.category_id,
             is_active: true,
             is_featured: false,
-            attributes: product.attributes,
+            attributes: product.attributes || {},
             tags: [],
           }, { onConflict: 'id' });
 
@@ -150,58 +116,40 @@ export default function ImportProducts() {
           throw new Error(`Product: ${productError.message}`);
         }
 
+        // Delete existing images for this product first
+        await supabase.from('product_images').delete().eq('product_id', product.id);
+
         // Insert images
         if (product.images && product.images.length > 0) {
           for (let imgIdx = 0; imgIdx < product.images.length; imgIdx++) {
             const imageUrl = product.images[imgIdx];
             if (imageUrl && imageUrl.trim()) {
-              await supabase.from('product_images').upsert({
+              const { error: imgError } = await supabase.from('product_images').insert({
                 product_id: product.id,
                 url: imageUrl,
-                alt_text: product.title,
+                alt_text: product.name,
                 is_primary: imgIdx === 0,
                 sort_order: imgIdx,
-              }, { onConflict: 'id' });
+              });
+              
+              if (imgError) {
+                console.warn(`Image insert warning for ${product.name}:`, imgError.message);
+              }
             }
           }
         }
 
-        // Insert variants
-        if (product.variants && product.variants.length > 0) {
-          for (const variant of product.variants) {
-            await supabase.from('product_variants').upsert({
-              id: variant.id,
-              product_id: product.id,
-              name: variant.name,
-              sku: variant.sku,
-              price: variant.price,
-              attributes: variant.attributes,
-              stock_quantity: variant.stockQuantity,
-              is_active: variant.stockQuantity > 0,
-            }, { onConflict: 'id' });
-
-            // Insert inventory for variant
-            await supabase.from('inventory').upsert({
-              product_id: product.id,
-              variant_id: variant.id,
-              quantity: variant.stockQuantity,
-              reserved_quantity: 0,
-              low_stock_threshold: 5,
-            }, { onConflict: 'id' });
-          }
-        }
-
-        // Insert main inventory
+        // Insert inventory
         await supabase.from('inventory').upsert({
           product_id: product.id,
-          quantity: product.stockQuantity,
+          quantity: product.stock_quantity || 0,
           reserved_quantity: 0,
           low_stock_threshold: 5,
         }, { onConflict: 'id' });
 
         successCount++;
       } catch (error) {
-        errors.push(`${product.title}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        errors.push(`${product.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
 
       setProgress(((i + 1) / total) * 100);
@@ -220,10 +168,10 @@ export default function ImportProducts() {
           
           <div className="text-center mb-6">
             <p className="text-muted-foreground mb-2">
-              סה"כ מוצרים לייבוא: <strong>{enhancedProducts.length}</strong>
+              סה"כ מוצרים לייבוא: <strong>{products.length}</strong>
             </p>
             <p className="text-sm text-muted-foreground">
-              כולל תמונות, וריאציות ומלאי
+              כולל תמונות ומלאי
             </p>
           </div>
 
