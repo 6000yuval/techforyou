@@ -12,6 +12,7 @@ import CartPage from "./pages/CartPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import OrderConfirmationPage from "./pages/OrderConfirmationPage";
 import SearchPage from "./pages/SearchPage";
+import ImportProducts from "./pages/ImportProducts";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
               <Route path="/checkout" element={<CheckoutPage />} />
               <Route path="/order-confirmation" element={<OrderConfirmationPage />} />
               <Route path="/search" element={<SearchPage />} />
+              <Route path="/import-products" element={<ImportProducts />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
