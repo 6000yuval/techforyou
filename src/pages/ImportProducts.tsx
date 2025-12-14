@@ -1,16 +1,88 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { enhancedProducts } from '@/data/enhancedProducts';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, ShieldAlert } from 'lucide-react';
 
 export default function ImportProducts() {
+  const navigate = useNavigate();
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<{ success: number; errors: string[] }>({ success: 0, errors: [] });
   const [completed, setCompleted] = useState(false);
+  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkAuthorization = async () => {
+      try {
+        // Check if user is authenticated
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError || !user) {
+          setAuthError('יש להתחבר כדי לגשת לעמוד זה');
+          setIsAuthorized(false);
+          return;
+        }
+
+        // Check if user has admin role using the has_role function
+        const { data: hasAdminRole, error: roleError } = await supabase.rpc('has_role', {
+          _user_id: user.id,
+          _role: 'admin'
+        });
+
+        if (roleError) {
+          setAuthError('שגיאה בבדיקת הרשאות');
+          setIsAuthorized(false);
+          return;
+        }
+
+        if (!hasAdminRole) {
+          setAuthError('אין לך הרשאות מנהל לגשת לעמוד זה');
+          setIsAuthorized(false);
+          return;
+        }
+
+        setIsAuthorized(true);
+      } catch {
+        setAuthError('שגיאה בבדיקת הרשאות');
+        setIsAuthorized(false);
+      }
+    };
+
+    checkAuthorization();
+  }, []);
+
+  // Show loading state while checking authorization
+  if (isAuthorized === null) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center" dir="rtl">
+        <Card className="p-8 text-center">
+          <Loader2 className="animate-spin h-8 w-8 mx-auto mb-4" />
+          <p>בודק הרשאות...</p>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show unauthorized message
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center" dir="rtl">
+        <Card className="p-8 text-center max-w-md">
+          <ShieldAlert className="h-16 w-16 mx-auto mb-4 text-destructive" />
+          <h1 className="text-xl font-bold mb-4">גישה נדחתה</h1>
+          <p className="text-muted-foreground mb-6">{authError}</p>
+          <Button onClick={() => navigate('/')} variant="outline">
+            חזור לדף הבית
+          </Button>
+        </Card>
+      </div>
+    );
+  }
 
   const importProducts = async () => {
     setImporting(true);
