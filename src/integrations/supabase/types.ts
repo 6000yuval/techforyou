@@ -184,6 +184,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_inventory_product"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "inventory_variant_id_fkey"
             columns: ["variant_id"]
             isOneToOne: false
@@ -409,7 +416,15 @@ export type Database = {
           sort_order?: number | null
           url?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_product_images_product"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_variants: {
         Row: {
@@ -449,6 +464,71 @@ export type Database = {
           product_id?: string
           sku?: string | null
           stock_quantity?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_product_variants_product"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          attributes: Json | null
+          category_id: string | null
+          compare_at_price: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          is_featured: boolean | null
+          name: string
+          price: number
+          short_description: string | null
+          sku: string | null
+          slug: string
+          subcategory_id: string | null
+          tags: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          attributes?: Json | null
+          category_id?: string | null
+          compare_at_price?: number | null
+          created_at?: string | null
+          description?: string | null
+          id: string
+          is_active?: boolean | null
+          is_featured?: boolean | null
+          name: string
+          price?: number
+          short_description?: string | null
+          sku?: string | null
+          slug: string
+          subcategory_id?: string | null
+          tags?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          attributes?: Json | null
+          category_id?: string | null
+          compare_at_price?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_featured?: boolean | null
+          name?: string
+          price?: number
+          short_description?: string | null
+          sku?: string | null
+          slug?: string
+          subcategory_id?: string | null
+          tags?: string[] | null
           updated_at?: string | null
         }
         Relationships: []
