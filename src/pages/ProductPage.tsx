@@ -244,21 +244,29 @@ const ProductPage: React.FC = () => {
                         {attr.name}: <span className="text-primary">{selectedAttributes[attr.name] || 'בחר אפשרות'}</span>
                       </label>
                       <div className="flex flex-wrap gap-2">
-                        {attr.values.map((value) => (
-                          <Button
-                            key={value}
-                            variant={selectedAttributes[attr.name] === value ? 'default' : 'outline'}
-                            size="lg"
-                            onClick={() => handleAttributeChange(attr.name, value)}
-                            className={`min-w-[80px] transition-all duration-300 ${
-                              selectedAttributes[attr.name] === value 
-                                ? 'ring-2 ring-primary/30' 
-                                : 'hover:border-primary'
-                            }`}
-                          >
-                            {value}
-                          </Button>
-                        ))}
+                        {(() => {
+                          const values = Array.isArray(attr.values)
+                            ? attr.values
+                            : typeof attr.values === 'string'
+                              ? [attr.values]
+                              : [];
+
+                          return values.map((value) => (
+                            <Button
+                              key={value}
+                              variant={selectedAttributes[attr.name] === value ? 'default' : 'outline'}
+                              size="lg"
+                              onClick={() => handleAttributeChange(attr.name, value)}
+                              className={`min-w-[80px] transition-all duration-300 ${
+                                selectedAttributes[attr.name] === value 
+                                  ? 'ring-2 ring-primary/30' 
+                                  : 'hover:border-primary'
+                              }`}
+                            >
+                              {value}
+                            </Button>
+                          ));
+                        })()}
                       </div>
                     </div>
                   ))}
