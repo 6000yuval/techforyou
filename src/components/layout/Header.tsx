@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, ShoppingCart, Menu, X, ChevronDown } from 'lucide-react';
+import { Search, ShoppingCart, Menu, X, ChevronDown, Settings, LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useCart } from '@/contexts/CartContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { categories } from '@/data/categories';
 import { cn } from '@/lib/utils';
 
@@ -13,6 +14,7 @@ const Header: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
   const { totalItems } = useCart();
+  const { user, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
 
   const handleSearch = (e: React.FormEvent) => {
@@ -77,6 +79,28 @@ const Header: React.FC = () => {
                 )}
               </Button>
             </Link>
+
+            {/* Admin / Auth */}
+            {user ? (
+              <div className="hidden md:flex items-center gap-1">
+                {isAdmin && (
+                  <Link to="/admin">
+                    <Button variant="ghost" size="icon">
+                      <Settings className="h-5 w-5" />
+                    </Button>
+                  </Link>
+                )}
+                <Button variant="ghost" size="icon" onClick={signOut}>
+                  <LogOut className="h-5 w-5" />
+                </Button>
+              </div>
+            ) : (
+              <Link to="/auth" className="hidden md:block">
+                <Button variant="ghost" size="icon">
+                  <User className="h-5 w-5" />
+                </Button>
+              </Link>
+            )}
 
             {/* Mobile Menu */}
             <Sheet>
