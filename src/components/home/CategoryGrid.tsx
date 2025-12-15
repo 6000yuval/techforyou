@@ -1,25 +1,25 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
-import { categories } from '@/data/categories';
+import { categories } from '@/hooks/useCategories';
 
 // Category images mapping - accurate images for each category
 const categoryImages: Record<string, string> = {
-  headphones: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop', // אוזניות
-  microphones: 'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=400&h=400&fit=crop', // מיקרופונים
-  speakers: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&h=400&fit=crop', // רמקולים
-  cameras: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=400&h=400&fit=crop', // מצלמות
-  mice: 'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=400&h=400&fit=crop', // עכברים
-  keyboards: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=400&h=400&fit=crop', // מקלדות
-  'computer-sets': 'https://images.unsplash.com/photo-1593640408182-31c70c8268f5?w=400&h=400&fit=crop', // סטים למחשב
-  cables: 'https://images.unsplash.com/photo-1601944179066-29786cb9d32a?w=400&h=400&fit=crop', // כבלים
-  adapters: 'https://images.unsplash.com/photo-1625723044792-44de16ccb4e9?w=400&h=400&fit=crop', // מתאמים
-  'hubs-docking': 'https://images.unsplash.com/photo-1625842268584-8f3296236761?w=400&h=400&fit=crop', // Hubs ותחנות עגינה
-  storage: 'https://images.unsplash.com/photo-1531492746076-161ca9bcad58?w=400&h=400&fit=crop', // אחסון חיצוני - SSD/HDD
-  network: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=400&h=400&fit=crop', // רשת - רשת ונתבים
-  'desk-setup': 'https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=400&h=400&fit=crop', // ארגון שולחן
-  'power-charging': 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=400&h=400&fit=crop', // חשמל וטעינה - מטענים
-  gaming: 'https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=400&h=400&fit=crop', // גיימינג - בקרים וציוד גיימינג
+  headphones: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
+  microphones: 'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=400&h=400&fit=crop',
+  speakers: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&h=400&fit=crop',
+  cameras: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=400&h=400&fit=crop',
+  mice: 'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=400&h=400&fit=crop',
+  keyboards: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=400&h=400&fit=crop',
+  'computer-sets': 'https://images.unsplash.com/photo-1593640408182-31c70c8268f5?w=400&h=400&fit=crop',
+  cables: 'https://images.unsplash.com/photo-1601944179066-29786cb9d32a?w=400&h=400&fit=crop',
+  adapters: 'https://images.unsplash.com/photo-1625723044792-44de16ccb4e9?w=400&h=400&fit=crop',
+  'hubs-docking': 'https://images.unsplash.com/photo-1625842268584-8f3296236761?w=400&h=400&fit=crop',
+  storage: 'https://images.unsplash.com/photo-1531492746076-161ca9bcad58?w=400&h=400&fit=crop',
+  network: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=400&h=400&fit=crop',
+  'desk-setup': 'https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=400&h=400&fit=crop',
+  'power-charging': 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=400&h=400&fit=crop',
+  gaming: 'https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=400&h=400&fit=crop',
 };
 
 const CategoryGrid: React.FC = () => {
