@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Package } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,25 +9,37 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useCart } from '@/contexts/CartContext';
+import { useShippingMethods } from '@/hooks/useShippingMethods';
+import { useCreateOrder } from '@/hooks/useCreateOrder';
 import { toast } from 'sonner';
 
 const CheckoutPage: React.FC = () => {
   const navigate = useNavigate();
   const { items, totalPrice, clearCart } = useCart();
+  const { data: shippingMethods, isLoading: loadingShipping } = useShippingMethods();
+  const createOrder = useCreateOrder();
   
   const [formData, setFormData] = useState({
-    fullName: '',
+    firstName: '',
+    lastName: '',
     email: '',
     phone: '',
     street: '',
     city: '',
     postalCode: '',
   });
-  const [shippingMethod, setShippingMethod] = useState('standard');
+  const [selectedShippingId, setSelectedShippingId] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState('credit');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Set default shipping method when loaded
+  useEffect(() => {
+    if (shippingMethods && shippingMethods.length > 0 && !selectedShippingId) {
+      setSelectedShippingId(shippingMethods[0].id);
+    }
+  }, [shippingMethods, selectedShippingId]);
 
   if (items.length === 0) {
     return (
@@ -42,10 +54,15 @@ const CheckoutPage: React.FC = () => {
     );
   }
 
+  const selectedShipping = shippingMethods?.find(m => m.id === selectedShippingId);
+  const shippingCost = selectedShipping?.price || 0;
+  const finalTotal = totalPrice + shippingCost;
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.fullName.trim()) newErrors.fullName = 'שדה חובה';
+    if (!formData.firstName.trim()) newErrors.firstName = 'שדה חובה';
+    if (!formData.lastName.trim()) newErrors.lastName = 'שדה חובה';
     if (!formData.email.trim()) {
       newErrors.email = 'שדה חובה';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
@@ -71,19 +88,41 @@ const CheckoutPage: React.FC = () => {
       return;
     }
 
-    setIsSubmitting(true);
+    if (!selectedShippingId) {
+      toast.error('יש לבחור שיטת משלוח');
+      return;
+    }
 
-    // Simulate order processing
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      const result = await createOrder.mutateAsync({
+        items,
+        shippingMethodId: selectedShippingId,
+        shippingCost,
+        subtotal: totalPrice,
+        total: finalTotal,
+        shippingDetails: {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phone: formData.phone,
+          street: formData.street,
+          city: formData.city,
+          postalCode: formData.postalCode,
+        },
+        paymentMethod,
+      });
 
-    const orderNumber = `ORD-${Date.now()}`;
-    clearCart();
-    
-    toast.success('ההזמנה בוצעה בהצלחה!', {
-      description: `מספר הזמנה: ${orderNumber}`,
-    });
+      clearCart();
+      
+      toast.success('ההזמנה בוצעה בהצלחה!', {
+        description: `מספר הזמנה: ${result.orderNumber}`,
+      });
 
-    navigate('/order-confirmation', { state: { orderNumber } });
+      navigate('/order-confirmation', { state: { orderNumber: result.orderNumber } });
+    } catch (error) {
+      console.error('Order error:', error);
+      toast.error('שגיאה ביצירת ההזמנה. אנא נסה שנית.');
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -93,9 +132,6 @@ const CheckoutPage: React.FC = () => {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
-
-  const shippingCost = shippingMethod === 'express' ? 29.90 : 0;
-  const finalTotal = totalPrice + shippingCost;
 
   return (
     <>
@@ -127,16 +163,45 @@ const CheckoutPage: React.FC = () => {
                   <CardContent className="space-y-4">
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="fullName">שם מלא *</Label>
+                        <Label htmlFor="firstName">שם פרטי *</Label>
                         <Input
-                          id="fullName"
-                          name="fullName"
-                          value={formData.fullName}
+                          id="firstName"
+                          name="firstName"
+                          value={formData.firstName}
                           onChange={handleInputChange}
-                          className={errors.fullName ? 'border-destructive' : ''}
+                          className={errors.firstName ? 'border-destructive' : ''}
                         />
-                        {errors.fullName && (
-                          <p className="text-sm text-destructive mt-1">{errors.fullName}</p>
+                        {errors.firstName && (
+                          <p className="text-sm text-destructive mt-1">{errors.firstName}</p>
+                        )}
+                      </div>
+                      <div>
+                        <Label htmlFor="lastName">שם משפחה *</Label>
+                        <Input
+                          id="lastName"
+                          name="lastName"
+                          value={formData.lastName}
+                          onChange={handleInputChange}
+                          className={errors.lastName ? 'border-destructive' : ''}
+                        />
+                        {errors.lastName && (
+                          <p className="text-sm text-destructive mt-1">{errors.lastName}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="email">אימייל *</Label>
+                        <Input
+                          id="email"
+                          name="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={handleInputChange}
+                          className={errors.email ? 'border-destructive' : ''}
+                        />
+                        {errors.email && (
+                          <p className="text-sm text-destructive mt-1">{errors.email}</p>
                         )}
                       </div>
                       <div>
@@ -154,20 +219,6 @@ const CheckoutPage: React.FC = () => {
                           <p className="text-sm text-destructive mt-1">{errors.phone}</p>
                         )}
                       </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="email">אימייל *</Label>
-                      <Input
-                        id="email"
-                        name="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        className={errors.email ? 'border-destructive' : ''}
-                      />
-                      {errors.email && (
-                        <p className="text-sm text-destructive mt-1">{errors.email}</p>
-                      )}
                     </div>
                     <div>
                       <Label htmlFor="street">כתובת *</Label>
@@ -216,28 +267,37 @@ const CheckoutPage: React.FC = () => {
                     <CardTitle>שיטת משלוח</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <RadioGroup value={shippingMethod} onValueChange={setShippingMethod}>
-                      <div className="flex items-center justify-between p-4 border border-border rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <RadioGroupItem value="standard" id="standard" />
-                          <Label htmlFor="standard" className="cursor-pointer">
-                            <span className="font-medium">משלוח רגיל</span>
-                            <span className="block text-sm text-muted-foreground">3-5 ימי עסקים</span>
-                          </Label>
-                        </div>
-                        <span className="font-medium text-success">חינם</span>
+                    {loadingShipping ? (
+                      <div className="space-y-3">
+                        <Skeleton className="h-20 w-full" />
                       </div>
-                      <div className="flex items-center justify-between p-4 border border-border rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <RadioGroupItem value="express" id="express" />
-                          <Label htmlFor="express" className="cursor-pointer">
-                            <span className="font-medium">משלוח אקספרס</span>
-                            <span className="block text-sm text-muted-foreground">1-2 ימי עסקים</span>
-                          </Label>
-                        </div>
-                        <span className="font-medium">₪29.90</span>
-                      </div>
-                    </RadioGroup>
+                    ) : shippingMethods && shippingMethods.length > 0 ? (
+                      <RadioGroup value={selectedShippingId} onValueChange={setSelectedShippingId}>
+                        {shippingMethods.map((method) => (
+                          <div key={method.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <RadioGroupItem value={method.id} id={method.id} />
+                              <Label htmlFor={method.id} className="cursor-pointer">
+                                <div className="flex items-center gap-2">
+                                  <Package className="h-4 w-4 text-muted-foreground" />
+                                  <span className="font-medium">{method.name_he}</span>
+                                </div>
+                                <span className="block text-sm text-muted-foreground">
+                                  {method.estimated_days_min && method.estimated_days_max 
+                                    ? `${method.estimated_days_min}-${method.estimated_days_max} ימי עסקים`
+                                    : method.description}
+                                </span>
+                              </Label>
+                            </div>
+                            <span className="font-medium">
+                              {method.price > 0 ? `₪${method.price.toFixed(2)}` : 'חינם'}
+                            </span>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    ) : (
+                      <p className="text-muted-foreground">אין שיטות משלוח זמינות</p>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -255,9 +315,9 @@ const CheckoutPage: React.FC = () => {
                         </Label>
                       </div>
                       <div className="flex items-center gap-3 p-4 border border-border rounded-lg">
-                        <RadioGroupItem value="paypal" id="paypal" />
-                        <Label htmlFor="paypal" className="cursor-pointer">
-                          PayPal
+                        <RadioGroupItem value="bit" id="bit" />
+                        <Label htmlFor="bit" className="cursor-pointer">
+                          ביט / תשלום בנקאי
                         </Label>
                       </div>
                     </RadioGroup>
@@ -316,9 +376,9 @@ const CheckoutPage: React.FC = () => {
                       type="submit"
                       size="lg"
                       className="w-full"
-                      disabled={isSubmitting}
+                      disabled={createOrder.isPending}
                     >
-                      {isSubmitting ? 'מעבד...' : 'אישור הזמנה'}
+                      {createOrder.isPending ? 'מעבד...' : 'אישור הזמנה'}
                     </Button>
                   </CardContent>
                 </Card>
