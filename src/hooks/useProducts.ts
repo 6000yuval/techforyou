@@ -27,6 +27,11 @@ interface DBInventory {
   quantity: number | null;
 }
 
+interface DBAttribute {
+  name: string;
+  values: string[];
+}
+
 // Transform DB product to frontend Product type
 const transformProduct = (
   dbProduct: DBProduct, 
@@ -41,11 +46,16 @@ const transformProduct = (
     return 0;
   });
 
-  // Parse attributes from JSON
-  const attributes = dbProduct.attributes as Record<string, string[]> | null;
-  const productAttributes = attributes 
-    ? Object.entries(attributes).map(([name, values]) => ({ name, values }))
-    : [];
+  // Parse attributes from JSON - DB stores as array of {name, values}
+  const rawAttributes = dbProduct.attributes;
+  let productAttributes: { name: string; values: string[] }[] = [];
+  
+  if (Array.isArray(rawAttributes)) {
+    productAttributes = (rawAttributes as DBAttribute[]).map(attr => ({
+      name: attr.name || '',
+      values: Array.isArray(attr.values) ? attr.values : []
+    }));
+  }
 
   return {
     id: dbProduct.id,
