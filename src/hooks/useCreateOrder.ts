@@ -7,6 +7,9 @@ interface CreateOrderInput {
   shippingMethodId: string;
   shippingCost: number;
   subtotal: number;
+  discountAmount?: number;
+  couponId?: string;
+  couponCode?: string;
   total: number;
   shippingDetails: {
     firstName: string;
@@ -39,6 +42,9 @@ export const useCreateOrder = () => {
         payment_status: 'pending' as const,
         subtotal: input.subtotal,
         shipping_cost: input.shippingCost,
+        discount_amount: input.discountAmount || 0,
+        coupon_id: input.couponId || null,
+        coupon_code: input.couponCode || null,
         total: input.total,
         shipping_method_id: input.shippingMethodId,
         shipping_first_name: input.shippingDetails.firstName,

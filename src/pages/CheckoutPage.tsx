@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { ChevronLeft, Package } from 'lucide-react';
+import { ChevronLeft, Package, Tag, X } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useCart } from '@/contexts/CartContext';
 import { useShippingMethods } from '@/hooks/useShippingMethods';
 import { useCreateOrder } from '@/hooks/useCreateOrder';
+import { useCoupon } from '@/hooks/useCoupon';
 import { toast } from 'sonner';
 
 const CheckoutPage: React.FC = () => {
@@ -20,6 +21,7 @@ const CheckoutPage: React.FC = () => {
   const { items, totalPrice, clearCart } = useCart();
   const { data: shippingMethods, isLoading: loadingShipping } = useShippingMethods();
   const createOrder = useCreateOrder();
+  const { coupon, isValidating, error: couponError, validateCoupon, clearCoupon, calculateDiscount } = useCoupon();
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -32,6 +34,7 @@ const CheckoutPage: React.FC = () => {
   });
   const [selectedShippingId, setSelectedShippingId] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState('credit');
+  const [couponCode, setCouponCode] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Set default shipping method when loaded
@@ -56,7 +59,12 @@ const CheckoutPage: React.FC = () => {
 
   const selectedShipping = shippingMethods?.find(m => m.id === selectedShippingId);
   const shippingCost = selectedShipping?.price || 0;
-  const finalTotal = totalPrice + shippingCost;
+  const discountAmount = calculateDiscount(totalPrice);
+  const finalTotal = totalPrice - discountAmount + shippingCost;
+
+  const handleApplyCoupon = async () => {
+    await validateCoupon(couponCode, totalPrice);
+  };
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -99,6 +107,9 @@ const CheckoutPage: React.FC = () => {
         shippingMethodId: selectedShippingId,
         shippingCost,
         subtotal: totalPrice,
+        discountAmount,
+        couponId: coupon?.id,
+        couponCode: coupon?.code,
         total: finalTotal,
         shippingDetails: {
           firstName: formData.firstName,
@@ -352,6 +363,48 @@ const CheckoutPage: React.FC = () => {
                       })}
                     </div>
 
+                    {/* Coupon Section */}
+                    <div className="mb-4">
+                      <Label className="text-sm text-muted-foreground mb-2 block">קוד קופון</Label>
+                      {coupon ? (
+                        <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg border border-primary/20">
+                          <div className="flex items-center gap-2">
+                            <Tag className="h-4 w-4 text-primary" />
+                            <span className="font-medium text-primary">{coupon.code}</span>
+                          </div>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={clearCoupon}
+                            className="h-auto p-1"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="הזן קוד"
+                            value={couponCode}
+                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                            className="flex-1"
+                          />
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            onClick={handleApplyCoupon}
+                            disabled={isValidating}
+                          >
+                            {isValidating ? '...' : 'החל'}
+                          </Button>
+                        </div>
+                      )}
+                      {couponError && (
+                        <p className="text-sm text-destructive mt-1">{couponError}</p>
+                      )}
+                    </div>
+
                     <Separator className="my-4" />
 
                     <div className="space-y-2">
@@ -359,6 +412,12 @@ const CheckoutPage: React.FC = () => {
                         <span>סה"כ מוצרים</span>
                         <span>₪{totalPrice.toFixed(2)}</span>
                       </div>
+                      {discountAmount > 0 && (
+                        <div className="flex justify-between text-primary">
+                          <span>הנחה ({coupon?.code})</span>
+                          <span>-₪{discountAmount.toFixed(2)}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between text-muted-foreground">
                         <span>משלוח</span>
                         <span>{shippingCost > 0 ? `₪${shippingCost.toFixed(2)}` : 'חינם'}</span>
