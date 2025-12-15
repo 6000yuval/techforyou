@@ -83,6 +83,11 @@ const Header: React.FC = () => {
             {/* Admin / Auth */}
             {user ? (
               <div className="hidden md:flex items-center gap-1">
+                <Link to="/account">
+                  <Button variant="ghost" size="icon">
+                    <User className="h-5 w-5" />
+                  </Button>
+                </Link>
                 {isAdmin && (
                   <Link to="/admin">
                     <Button variant="ghost" size="icon">
@@ -114,6 +119,16 @@ const Header: React.FC = () => {
                   <Link to="/" className="text-lg font-medium hover:text-primary transition-colors">
                     דף הבית
                   </Link>
+                  {user && (
+                    <Link to="/account" className="text-lg font-medium hover:text-primary transition-colors">
+                      האזור שלי
+                    </Link>
+                  )}
+                  {!user && (
+                    <Link to="/auth" className="text-lg font-medium hover:text-primary transition-colors">
+                      התחברות
+                    </Link>
+                  )}
                   {categories.slice(0, 10).map((category) => (
                     <Link
                       key={category.id}
