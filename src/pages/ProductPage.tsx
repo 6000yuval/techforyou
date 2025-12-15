@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { 
-  ChevronLeft, Minus, Plus, ShoppingCart, Check, Truck, Shield, 
-  RotateCcw, CreditCard, Star, Heart, Share2, Package, Clock, Award
+  ChevronLeft, Minus, Plus, ShoppingCart, CreditCard, Star, Heart, Share2, Clock, Award,
+  Truck, Shield, RotateCcw
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import ProductGrid from '@/components/products/ProductGrid';
@@ -12,19 +12,51 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useCart } from '@/contexts/CartContext';
-import { getProductBySlug, products } from '@/data/products';
-import { getCategoryBySlug } from '@/data/categories';
+import { useProduct, useProducts } from '@/hooks/useProducts';
+import { getCategoryBySlug } from '@/hooks/useCategories';
 import { toast } from 'sonner';
+
+const ProductPageSkeleton = () => (
+  <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
+    <div className="space-y-4">
+      <Skeleton className="aspect-square rounded-2xl" />
+      <div className="grid grid-cols-4 gap-3">
+        {[...Array(4)].map((_, i) => (
+          <Skeleton key={i} className="aspect-square rounded-xl" />
+        ))}
+      </div>
+    </div>
+    <div className="space-y-6">
+      <Skeleton className="h-8 w-24" />
+      <Skeleton className="h-12 w-full" />
+      <Skeleton className="h-24 w-full rounded-2xl" />
+      <Skeleton className="h-20 w-full" />
+      <Skeleton className="h-14 w-full rounded-xl" />
+    </div>
+  </div>
+);
 
 const ProductPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
-  const product = getProductBySlug(slug || '');
+  const { data: product, isLoading } = useProduct(slug || '');
+  const { data: allProducts } = useProducts();
   const { addItem } = useCart();
   
   const [quantity, setQuantity] = useState(1);
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
   const [selectedImage, setSelectedImage] = useState(0);
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="container py-6 lg:py-8">
+          <ProductPageSkeleton />
+        </div>
+      </Layout>
+    );
+  }
 
   if (!product) {
     return (
@@ -46,7 +78,7 @@ const ProductPage: React.FC = () => {
     : 0;
   const currentPrice = product.sale_price || product.price;
 
-  const relatedProducts = products
+  const relatedProducts = (allProducts || [])
     .filter(p => p.category_id === product.category_id && p.id !== product.id)
     .slice(0, 4);
 
@@ -109,7 +141,7 @@ const ProductPage: React.FC = () => {
                   </Badge>
                 )}
                 <img
-                  src={product.images[selectedImage] || product.images[0]}
+                  src={product.images[selectedImage] || product.images[0] || '/placeholder.svg'}
                   alt={product.name}
                   className="w-full h-full object-contain p-8 group-hover:scale-105 transition-transform duration-500"
                 />
@@ -392,47 +424,28 @@ const ProductPage: React.FC = () => {
               <TabsContent value="specs" className="mt-8 text-right">
                 <Card>
                   <CardContent className="p-8">
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="flex justify-between py-3 border-b border-border">
-                        <span className="font-medium">קטגוריה</span>
-                        <span className="text-muted-foreground">{product.category_name}</span>
+                    {product.attributes && product.attributes.length > 0 ? (
+                      <div className="space-y-4">
+                        {product.attributes.map((attr) => (
+                          <div key={attr.name} className="flex border-b border-border pb-4 last:border-0">
+                            <span className="w-1/3 font-semibold text-foreground">{attr.name}</span>
+                            <span className="w-2/3 text-muted-foreground">{attr.values.join(', ')}</span>
+                          </div>
+                        ))}
                       </div>
-                      <div className="flex justify-between py-3 border-b border-border">
-                        <span className="font-medium">מק"ט</span>
-                        <span className="text-muted-foreground">{product.id}</span>
-                      </div>
-                      <div className="flex justify-between py-3 border-b border-border">
-                        <span className="font-medium">זמינות</span>
-                        <span className={product.in_stock ? 'text-green-600' : 'text-destructive'}>
-                          {product.in_stock ? 'במלאי' : 'אזל'}
-                        </span>
-                      </div>
-                      {product.attributes?.map((attr) => (
-                        <div key={attr.name} className="flex justify-between py-3 border-b border-border">
-                          <span className="font-medium">{attr.name}</span>
-                          <span className="text-muted-foreground">{attr.values.join(', ')}</span>
-                        </div>
-                      ))}
-                    </div>
+                    ) : (
+                      <p className="text-muted-foreground">אין מפרט טכני זמין למוצר זה.</p>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
               
-              <TabsContent value="reviews" className="mt-8">
+              <TabsContent value="reviews" className="mt-8 text-right">
                 <Card>
                   <CardContent className="p-8 text-center">
-                    <div className="flex items-center justify-center gap-2 mb-4">
-                      {[...Array(5)].map((_, i) => (
-                        <Star 
-                          key={i} 
-                          className={`h-8 w-8 ${i < Math.floor(rating) ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30'}`} 
-                        />
-                      ))}
-                    </div>
-                    <p className="text-3xl font-bold text-foreground mb-2">{rating}/5</p>
-                    <p className="text-muted-foreground mb-6">מבוסס על {reviewCount} ביקורות</p>
-                    <Button variant="outline" size="lg">
-                      כתוב ביקורת
+                    <p className="text-muted-foreground">עדיין אין ביקורות למוצר זה.</p>
+                    <Button variant="outline" className="mt-4">
+                      היה הראשון לכתוב ביקורת
                     </Button>
                   </CardContent>
                 </Card>
@@ -443,15 +456,7 @@ const ProductPage: React.FC = () => {
           {/* Related Products */}
           {relatedProducts.length > 0 && (
             <section className="mt-16">
-              <div className="flex items-center justify-between mb-8">
-                <h2 className="text-2xl md:text-3xl font-bold text-foreground">מוצרים דומים</h2>
-                <Link to={`/category/${product.category_id}`}>
-                  <Button variant="outline">
-                    לכל המוצרים
-                    <ChevronLeft className="h-4 w-4 mr-2" />
-                  </Button>
-                </Link>
-              </div>
+              <h2 className="text-2xl font-bold text-foreground mb-8">מוצרים קשורים</h2>
               <ProductGrid products={relatedProducts} />
             </section>
           )}

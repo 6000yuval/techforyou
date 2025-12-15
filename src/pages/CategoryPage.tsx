@@ -9,14 +9,29 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { getCategoryBySlug, getParentCategory } from '@/data/categories';
-import { products } from '@/data/products';
+import { Skeleton } from '@/components/ui/skeleton';
+import { getCategoryBySlug, getParentCategory, mapDbCategoryId } from '@/hooks/useCategories';
+import { useProducts } from '@/hooks/useProducts';
 import { productBelongsToSubcategory } from '@/utils/productSubcategoryMatcher';
+
+const ProductGridSkeleton = () => (
+  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    {[...Array(8)].map((_, i) => (
+      <div key={i} className="space-y-3">
+        <Skeleton className="aspect-square rounded-lg" />
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-4 w-1/2" />
+      </div>
+    ))}
+  </div>
+);
 
 const CategoryPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const category = getCategoryBySlug(slug || '');
   const parentCategory = getParentCategory(slug || '');
+  
+  const { data: allProducts, isLoading } = useProducts();
   
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]);
   const [inStockOnly, setInStockOnly] = useState(false);
@@ -26,17 +41,22 @@ const CategoryPage: React.FC = () => {
 
   // Get all products for this category or subcategory
   const baseCategoryProducts = useMemo(() => {
+    if (!allProducts) return [];
+    
     // If we're on a subcategory page
     if (parentCategory) {
-      // Filter products that belong to the parent category AND match the subcategory
-      return products.filter(p => 
-        p.category_id === parentCategory.id && 
-        productBelongsToSubcategory(p, slug || '')
-      );
+      return allProducts.filter(p => {
+        const mappedCategoryId = mapDbCategoryId(p.category_id);
+        return mappedCategoryId === parentCategory.id && 
+          productBelongsToSubcategory(p, slug || '');
+      });
     }
     // If we're on a main category page, show all products from that category
-    return products.filter(p => p.category_id === category?.id);
-  }, [category, parentCategory, slug]);
+    return allProducts.filter(p => {
+      const mappedCategoryId = mapDbCategoryId(p.category_id);
+      return mappedCategoryId === category?.id;
+    });
+  }, [allProducts, category, parentCategory, slug]);
 
   // Extract available connection types from products
   const availableConnectionTypes = useMemo(() => {
@@ -240,9 +260,11 @@ const CategoryPage: React.FC = () => {
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-3xl font-bold text-foreground">{category.name}</h1>
-            <span className="text-muted-foreground">
-              {categoryProducts.length} מוצרים
-            </span>
+            {!isLoading && (
+              <span className="text-muted-foreground">
+                {categoryProducts.length} מוצרים
+              </span>
+            )}
           </div>
 
           {/* Subcategories */}
@@ -300,7 +322,11 @@ const CategoryPage: React.FC = () => {
                 </Sheet>
               </div>
 
-              <ProductGrid products={categoryProducts} />
+              {isLoading ? (
+                <ProductGridSkeleton />
+              ) : (
+                <ProductGrid products={categoryProducts} />
+              )}
             </div>
           </div>
         </div>
