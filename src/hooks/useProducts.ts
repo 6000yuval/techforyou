@@ -344,11 +344,14 @@ export const useSearchProducts = (query: string) => {
     queryFn: async () => {
       if (!query.trim()) return [];
 
+      // Sanitize query to escape SQL LIKE special characters
+      const sanitizedQuery = query.replace(/[%_\\]/g, '\\$&');
+
       const { data: products, error } = await supabase
         .from('products')
         .select('*')
         .eq('is_active', true)
-        .or(`name.ilike.%${query}%,short_description.ilike.%${query}%,description.ilike.%${query}%`);
+        .or(`name.ilike.%${sanitizedQuery}%,short_description.ilike.%${sanitizedQuery}%,description.ilike.%${sanitizedQuery}%`);
 
       if (error) throw error;
 
