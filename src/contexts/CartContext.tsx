@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { medusa, getCartId, setCartId, clearCartId, getRegionId, setRegionId } from '@/integrations/medusa/client';
+import { medusa, getCartId, setCartId, clearCartId, getRegionId, setRegionId, isDemoMode } from '@/integrations/medusa/client';
 import { Product, ProductVariation } from '@/types';
 
 interface MedusaLineItem {
@@ -48,11 +48,38 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
+// Demo mode storage key
+const DEMO_CART_KEY = 'demo_cart_items';
+
+// Get demo cart from localStorage
+const getDemoCart = (): CartItem[] => {
+  try {
+    const stored = localStorage.getItem(DEMO_CART_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+// Save demo cart to localStorage
+const saveDemoCart = (items: CartItem[]) => {
+  localStorage.setItem(DEMO_CART_KEY, JSON.stringify(items));
+};
+
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>([]);
-  const [cartId, setCartIdState] = useState<string | null>(getCartId());
+  const [cartId, setCartIdState] = useState<string | null>(isDemoMode ? 'demo-cart' : getCartId());
   const [isLoading, setIsLoading] = useState(false);
   const [totalPrice, setTotalPrice] = useState(0);
+
+  // Calculate total price from items
+  const calculateTotalPrice = useCallback((cartItems: CartItem[]): number => {
+    return cartItems.reduce((sum, item) => {
+      const price = item.variation?.sale_price || item.variation?.price || 
+                    item.product.sale_price || item.product.price;
+      return sum + (price * item.quantity);
+    }, 0);
+  }, []);
 
   // Transform Medusa line items to our CartItem format
   const transformLineItems = (lineItems: MedusaLineItem[]): CartItem[] => {
@@ -81,6 +108,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Initialize or get region
   const ensureRegion = async (): Promise<string> => {
+    if (isDemoMode) return 'demo-region';
+    
     let regionId = getRegionId();
     if (!regionId) {
       try {
@@ -103,6 +132,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Create or get cart
   const ensureCart = async (): Promise<string | null> => {
+    if (isDemoMode) return 'demo-cart';
+    
     let id = getCartId();
     
     if (id) {
@@ -137,8 +168,16 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return id;
   };
 
-  // Refresh cart from Medusa
+  // Refresh cart from Medusa or localStorage (demo mode)
   const refreshCart = useCallback(async () => {
+    // Demo mode - use localStorage
+    if (isDemoMode) {
+      const demoItems = getDemoCart();
+      setItems(demoItems);
+      setTotalPrice(calculateTotalPrice(demoItems));
+      return;
+    }
+
     const id = getCartId();
     if (!id) {
       setItems([]);
@@ -161,7 +200,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setItems([]);
       setTotalPrice(0);
     }
-  }, []);
+  }, [calculateTotalPrice]);
 
   // Load cart on mount
   useEffect(() => {
@@ -172,9 +211,39 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     product: Product,
     quantity = 1,
     variation?: ProductVariation,
-    _attributes?: Record<string, string>
+    attributes?: Record<string, string>
   ) => {
     setIsLoading(true);
+    
+    // Demo mode - use localStorage
+    if (isDemoMode) {
+      const currentItems = getDemoCart();
+      const existingIndex = currentItems.findIndex(
+        item => item.product.id === product.id && 
+                (!variation || item.variation?.id === variation.id)
+      );
+      
+      if (existingIndex >= 0) {
+        currentItems[existingIndex].quantity += quantity;
+      } else {
+        const newItem: CartItem = {
+          id: `${product.id}-${Date.now()}`,
+          lineItemId: `${product.id}-${Date.now()}`,
+          product,
+          quantity,
+          variation,
+          selected_attributes: attributes,
+        };
+        currentItems.push(newItem);
+      }
+      
+      saveDemoCart(currentItems);
+      setItems(currentItems);
+      setTotalPrice(calculateTotalPrice(currentItems));
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const id = await ensureCart();
       if (!id) throw new Error('Could not create cart');
@@ -196,10 +265,24 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const removeItem = async (itemId: string) => {
-    const id = getCartId();
-    if (!id) return;
-
     setIsLoading(true);
+    
+    // Demo mode
+    if (isDemoMode) {
+      const currentItems = getDemoCart().filter(item => item.id !== itemId);
+      saveDemoCart(currentItems);
+      setItems(currentItems);
+      setTotalPrice(calculateTotalPrice(currentItems));
+      setIsLoading(false);
+      return;
+    }
+
+    const id = getCartId();
+    if (!id) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
       await medusa.store.cart.deleteLineItem(id, itemId);
       await refreshCart();
@@ -211,15 +294,33 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const updateQuantity = async (itemId: string, quantity: number) => {
-    const id = getCartId();
-    if (!id) return;
-
     if (quantity < 1) {
       await removeItem(itemId);
       return;
     }
 
     setIsLoading(true);
+    
+    // Demo mode
+    if (isDemoMode) {
+      const currentItems = getDemoCart();
+      const itemIndex = currentItems.findIndex(item => item.id === itemId);
+      if (itemIndex >= 0) {
+        currentItems[itemIndex].quantity = quantity;
+        saveDemoCart(currentItems);
+        setItems(currentItems);
+        setTotalPrice(calculateTotalPrice(currentItems));
+      }
+      setIsLoading(false);
+      return;
+    }
+
+    const id = getCartId();
+    if (!id) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
       await medusa.store.cart.updateLineItem(id, itemId, {
         quantity,
@@ -233,10 +334,23 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const clearCart = async () => {
-    const id = getCartId();
-    if (!id) return;
-
     setIsLoading(true);
+    
+    // Demo mode
+    if (isDemoMode) {
+      saveDemoCart([]);
+      setItems([]);
+      setTotalPrice(0);
+      setIsLoading(false);
+      return;
+    }
+
+    const id = getCartId();
+    if (!id) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
       // Delete all line items
       for (const item of items) {

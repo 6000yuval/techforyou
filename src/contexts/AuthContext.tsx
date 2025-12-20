@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { medusa } from '@/integrations/medusa/client';
+import { medusa, isDemoMode } from '@/integrations/medusa/client';
 
 interface MedusaCustomer {
   id: string;
@@ -23,11 +23,39 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Demo mode storage key
+const DEMO_USER_KEY = 'demo_user';
+
+// Get demo user from localStorage
+const getDemoUser = (): MedusaCustomer | null => {
+  try {
+    const stored = localStorage.getItem(DEMO_USER_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+};
+
+// Save demo user to localStorage
+const saveDemoUser = (user: MedusaCustomer | null) => {
+  if (user) {
+    localStorage.setItem(DEMO_USER_KEY, JSON.stringify(user));
+  } else {
+    localStorage.removeItem(DEMO_USER_KEY);
+  }
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [customer, setCustomer] = useState<MedusaCustomer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshCustomer = async () => {
+    // Demo mode - use localStorage
+    if (isDemoMode) {
+      setCustomer(getDemoUser());
+      return;
+    }
+
     try {
       const { customer: medusaCustomer } = await medusa.store.customer.retrieve();
       if (medusaCustomer) {
@@ -60,6 +88,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    // Demo mode - simple local auth
+    if (isDemoMode) {
+      const demoUser: MedusaCustomer = {
+        id: `demo-${Date.now()}`,
+        email,
+        first_name: email.split('@')[0],
+        created_at: new Date().toISOString(),
+      };
+      saveDemoUser(demoUser);
+      setCustomer(demoUser);
+      return { error: null };
+    }
+
     try {
       // Medusa 2.0 auth flow
       await medusa.auth.login('customer', 'emailpass', {
@@ -78,6 +119,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
+    // Demo mode - simple local auth
+    if (isDemoMode) {
+      const demoUser: MedusaCustomer = {
+        id: `demo-${Date.now()}`,
+        email,
+        first_name: firstName || email.split('@')[0],
+        last_name: lastName,
+        created_at: new Date().toISOString(),
+      };
+      saveDemoUser(demoUser);
+      setCustomer(demoUser);
+      return { error: null };
+    }
+
     try {
       // Register with Medusa 2.0
       await medusa.auth.register('customer', 'emailpass', {
@@ -114,6 +169,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    // Demo mode
+    if (isDemoMode) {
+      saveDemoUser(null);
+      setCustomer(null);
+      return;
+    }
+
     try {
       await medusa.auth.logout();
     } catch (error) {

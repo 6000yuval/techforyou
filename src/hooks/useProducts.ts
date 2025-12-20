@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { medusa, getRegionId, setRegionId } from '@/integrations/medusa/client';
+import { medusa, getRegionId, setRegionId, isDemoMode } from '@/integrations/medusa/client';
 import { transformMedusaProduct } from '@/integrations/medusa/transforms';
+import { products as mockProducts } from '@/data/products';
 import type { Product } from '@/types';
 import type { MedusaProduct } from '@/integrations/medusa/types';
 
@@ -25,6 +26,11 @@ export const useProducts = () => {
   return useQuery({
     queryKey: ['products'],
     queryFn: async (): Promise<Product[]> => {
+      // Demo mode - return mock data
+      if (isDemoMode) {
+        return mockProducts;
+      }
+
       const regionId = await ensureRegionId();
       
       const { products } = await medusa.store.product.list({
@@ -43,6 +49,11 @@ export const useProduct = (slug: string) => {
   return useQuery({
     queryKey: ['product', slug],
     queryFn: async (): Promise<Product | null> => {
+      // Demo mode - return mock data
+      if (isDemoMode) {
+        return mockProducts.find(p => p.slug === slug) || null;
+      }
+
       const regionId = await ensureRegionId();
       
       const { products } = await medusa.store.product.list({
@@ -63,6 +74,11 @@ export const useProductsByCategory = (categoryHandle: string) => {
   return useQuery({
     queryKey: ['products', 'category', categoryHandle],
     queryFn: async (): Promise<Product[]> => {
+      // Demo mode - return mock data filtered by category
+      if (isDemoMode) {
+        return mockProducts.filter(p => p.category_id === categoryHandle);
+      }
+
       const regionId = await ensureRegionId();
       
       // First get the category ID from handle
@@ -94,6 +110,11 @@ export const useFeaturedProducts = () => {
   return useQuery({
     queryKey: ['products', 'featured'],
     queryFn: async (): Promise<Product[]> => {
+      // Demo mode - return first 8 products
+      if (isDemoMode) {
+        return mockProducts.slice(0, 8);
+      }
+
       const regionId = await ensureRegionId();
       
       // Try to get products from "featured" collection
@@ -132,6 +153,11 @@ export const useProductsOnSale = () => {
   return useQuery({
     queryKey: ['products', 'on-sale'],
     queryFn: async (): Promise<Product[]> => {
+      // Demo mode - return products with sale_price
+      if (isDemoMode) {
+        return mockProducts.filter(p => p.sale_price && p.sale_price < p.price).slice(0, 8);
+      }
+
       const regionId = await ensureRegionId();
       
       // Try to get products from "sale" collection
@@ -180,6 +206,16 @@ export const useSearchProducts = (query: string) => {
     queryKey: ['products', 'search', query],
     queryFn: async (): Promise<Product[]> => {
       if (!query.trim()) return [];
+
+      // Demo mode - search in mock data
+      if (isDemoMode) {
+        const lowerQuery = query.toLowerCase();
+        return mockProducts.filter(p => 
+          p.name.toLowerCase().includes(lowerQuery) ||
+          p.description?.toLowerCase().includes(lowerQuery) ||
+          p.short_description?.toLowerCase().includes(lowerQuery)
+        );
+      }
 
       const regionId = await ensureRegionId();
       
