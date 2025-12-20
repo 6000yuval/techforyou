@@ -59,12 +59,12 @@ const transformOrder = (medusaOrder: MedusaOrder): Order => {
 };
 
 export function useUserOrders() {
-  const { user } = useAuth();
+  const { customer, isAuthenticated } = useAuth();
 
   return useQuery({
-    queryKey: ['user-orders', user?.id],
+    queryKey: ['user-orders', customer?.id],
     queryFn: async (): Promise<Order[]> => {
-      if (!user) return [];
+      if (!isAuthenticated) return [];
 
       try {
         const { orders } = await medusa.store.order.list();
@@ -74,7 +74,7 @@ export function useUserOrders() {
         return [];
       }
     },
-    enabled: !!user,
+    enabled: isAuthenticated,
   });
 }
 
