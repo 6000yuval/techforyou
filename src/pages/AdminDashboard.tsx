@@ -1,11 +1,12 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { ExternalLink } from 'lucide-react';
 
 // Admin dashboard is now handled by Medusa Admin
-// This page just redirects or shows a message
 export default function AdminDashboard() {
-  const { isAuthenticated, isAdmin, isLoading } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -19,9 +20,10 @@ export default function AdminDashboard() {
     return <Navigate to="/auth" replace />;
   }
 
-  // Since admin is handled by Medusa Admin, show info
+  const medusaAdminUrl = import.meta.env.VITE_MEDUSA_ADMIN_URL || 'http://localhost:9000/app';
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4" dir="rtl">
       <Card className="max-w-lg">
         <CardHeader>
           <CardTitle>ניהול החנות</CardTitle>
@@ -30,11 +32,16 @@ export default function AdminDashboard() {
           <p className="text-muted-foreground">
             ניהול מוצרים, הזמנות ולקוחות נעשה דרך פאנל הניהול של Medusa.
           </p>
-          <p className="text-sm text-muted-foreground">
-            גש אל: <code className="bg-muted px-2 py-1 rounded">http://localhost:9000/app</code>
-          </p>
-          <p className="text-sm text-muted-foreground">
-            או השתמש בכתובת הפרודקשן של Medusa Admin שלך.
+          
+          <Button asChild className="w-full">
+            <a href={medusaAdminUrl} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="ml-2 h-4 w-4" />
+              פתח פאנל ניהול Medusa
+            </a>
+          </Button>
+
+          <p className="text-xs text-muted-foreground text-center">
+            {medusaAdminUrl}
           </p>
         </CardContent>
       </Card>
