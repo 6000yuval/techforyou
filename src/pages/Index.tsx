@@ -7,7 +7,7 @@ import ProductGrid from '@/components/products/ProductGrid';
 import { useFeaturedProducts, useProductsOnSale } from '@/hooks/useProducts';
 import { Skeleton } from '@/components/ui/skeleton';
 
-const ProductGridSkeleton = () => (
+const ProductGridSkeleton: React.FC = () => (
   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
     {[...Array(8)].map((_, i) => (
       <div key={i} className="space-y-3">

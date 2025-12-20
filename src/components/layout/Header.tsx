@@ -14,7 +14,7 @@ const Header: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
   const { totalItems } = useCart();
-  const { user, isAdmin, signOut } = useAuth();
+  const { customer, isAuthenticated, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
 
   const handleSearch = (e: React.FormEvent) => {
@@ -81,7 +81,7 @@ const Header: React.FC = () => {
             </Link>
 
             {/* Admin / Auth */}
-            {user ? (
+            {isAuthenticated ? (
               <div className="hidden md:flex items-center gap-1">
                 <Link to="/account">
                   <Button variant="ghost" size="icon">
@@ -119,12 +119,12 @@ const Header: React.FC = () => {
                   <Link to="/" className="text-lg font-medium hover:text-primary transition-colors">
                     דף הבית
                   </Link>
-                  {user && (
+                  {isAuthenticated && (
                     <Link to="/account" className="text-lg font-medium hover:text-primary transition-colors">
                       האזור שלי
                     </Link>
                   )}
-                  {!user && (
+                  {!isAuthenticated && (
                     <Link to="/auth" className="text-lg font-medium hover:text-primary transition-colors">
                       התחברות
                     </Link>

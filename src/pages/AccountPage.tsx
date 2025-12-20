@@ -27,14 +27,14 @@ const statusLabels: Record<string, { label: string; variant: 'default' | 'second
 };
 
 const AccountPage: React.FC = () => {
-  const { user, signOut } = useAuth();
+  const { customer, isAuthenticated, signOut } = useAuth();
   const { data: orders, isLoading: loadingOrders } = useUserOrders();
   const { addresses, isLoading: loadingAddresses, deleteAddress } = useUserAddresses();
   const { wishlistItems, isLoading: loadingWishlist, removeFromWishlist } = useWishlist();
   const { data: allProducts } = useProducts();
   const [activeTab, setActiveTab] = useState('orders');
 
-  if (!user) {
+  if (!isAuthenticated) {
     return <Navigate to="/auth" replace />;
   }
 
@@ -52,7 +52,7 @@ const AccountPage: React.FC = () => {
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-3xl font-bold text-foreground">האזור האישי</h1>
-              <p className="text-muted-foreground mt-1">{user.email}</p>
+              <p className="text-muted-foreground mt-1">{customer?.email}</p>
             </div>
             <Button variant="outline" onClick={signOut}>
               <LogOut className="h-4 w-4 ml-2" />

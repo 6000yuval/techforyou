@@ -15,7 +15,7 @@ const authSchema = z.object({
 });
 
 export default function AuthPage() {
-  const { user, isLoading, signIn, signUp } = useAuth();
+  const { isAuthenticated, isLoading, signIn, signUp } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,8 +28,8 @@ export default function AuthPage() {
     );
   }
 
-  if (user) {
-    return <Navigate to="/admin" replace />;
+  if (isAuthenticated) {
+    return <Navigate to="/account" replace />;
   }
 
   const handleSubmit = async (mode: 'signin' | 'signup') => {
@@ -46,15 +46,15 @@ export default function AuthPage() {
         : await signUp(email, password);
 
       if (error) {
-        if (error.message.includes('Invalid login credentials')) {
+        if (error.message.includes('Invalid login credentials') || error.message.includes('invalid')) {
           toast.error('אימייל או סיסמה שגויים');
-        } else if (error.message.includes('User already registered')) {
+        } else if (error.message.includes('already registered') || error.message.includes('exists')) {
           toast.error('משתמש כבר קיים עם אימייל זה');
         } else {
           toast.error(error.message);
         }
       } else if (mode === 'signup') {
-        toast.success('נרשמת בהצלחה! בדוק את האימייל לאישור.');
+        toast.success('נרשמת בהצלחה!');
       }
     } finally {
       setIsSubmitting(false);

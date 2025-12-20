@@ -50,19 +50,18 @@ const transformAddress = (addr: MedusaAddress, index: number): Address => {
 };
 
 export function useUserAddresses() {
-  const { user } = useAuth();
+  const { customer, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: addresses = [], isLoading } = useQuery({
-    queryKey: ['user-addresses', user?.id],
+    queryKey: ['user-addresses', customer?.id],
     queryFn: async (): Promise<Address[]> => {
-      if (!user) return [];
+      if (!isAuthenticated) return [];
 
       try {
-        const { customer } = await medusa.store.customer.retrieve();
-        if (!customer) return [];
+        const { customer: cust } = await medusa.store.customer.retrieve();
+        if (!cust) return [];
         
-        // Get addresses from customer
         const { addresses: medusaAddresses } = await medusa.store.customer.listAddress();
         return (medusaAddresses || []).map((addr: MedusaAddress, index: number) => 
           transformAddress(addr, index)
@@ -72,12 +71,12 @@ export function useUserAddresses() {
         return [];
       }
     },
-    enabled: !!user,
+    enabled: isAuthenticated,
   });
 
   const addAddress = useMutation({
     mutationFn: async (address: AddressInput) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!isAuthenticated) throw new Error('Must be logged in');
 
       await medusa.store.customer.createAddress({
         first_name: address.first_name,
@@ -92,7 +91,7 @@ export function useUserAddresses() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['user-addresses', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['user-addresses', customer?.id] });
     },
   });
 
@@ -110,7 +109,7 @@ export function useUserAddresses() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['user-addresses', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['user-addresses', customer?.id] });
     },
   });
 
@@ -119,18 +118,16 @@ export function useUserAddresses() {
       await medusa.store.customer.deleteAddress(id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['user-addresses', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['user-addresses', customer?.id] });
     },
   });
 
   const setDefaultAddress = useMutation({
     mutationFn: async ({ id, type }: { id: string; type: 'shipping' | 'billing' }) => {
-      if (!user) throw new Error('Must be logged in');
-      // Medusa handles default addresses differently - this is a placeholder
       console.log(`Setting ${type} default address to ${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['user-addresses', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['user-addresses', customer?.id] });
     },
   });
 

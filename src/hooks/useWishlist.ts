@@ -25,16 +25,16 @@ const setStoredWishlist = (items: WishlistItem[], userId?: string) => {
 };
 
 export function useWishlist() {
-  const { user } = useAuth();
+  const { customer } = useAuth();
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load wishlist on mount and when user changes
+  // Load wishlist on mount and when customer changes
   useEffect(() => {
-    const items = getStoredWishlist(user?.id);
+    const items = getStoredWishlist(customer?.id);
     setWishlistItems(items);
     setIsLoading(false);
-  }, [user?.id]);
+  }, [customer?.id]);
 
   const addToWishlist = useCallback(async (productId: string) => {
     const newItem: WishlistItem = {
@@ -45,14 +45,14 @@ export function useWishlist() {
     
     const updated = [...wishlistItems, newItem];
     setWishlistItems(updated);
-    setStoredWishlist(updated, user?.id);
-  }, [wishlistItems, user?.id]);
+    setStoredWishlist(updated, customer?.id);
+  }, [wishlistItems, customer?.id]);
 
   const removeFromWishlist = useCallback(async (productId: string) => {
     const updated = wishlistItems.filter(item => item.product_id !== productId);
     setWishlistItems(updated);
-    setStoredWishlist(updated, user?.id);
-  }, [wishlistItems, user?.id]);
+    setStoredWishlist(updated, customer?.id);
+  }, [wishlistItems, customer?.id]);
 
   const isInWishlist = useCallback((productId: string): boolean => {
     return wishlistItems.some(item => item.product_id === productId);
