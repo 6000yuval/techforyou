@@ -1,16 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { CartItem } from '@/types';
+import { medusa, getCartId, clearCartId } from '@/integrations/medusa/client';
+import type { MedusaOrder } from '@/integrations/medusa/types';
+
 interface CreateOrderInput {
-  items: CartItem[];
-  shippingMethodId: string;
-  shippingCost: number;
-  subtotal: number;
-  discountAmount?: number;
-  couponId?: string;
-  couponCode?: string;
-  total: number;
   shippingDetails: {
     firstName: string;
     lastName: string;
@@ -20,7 +12,15 @@ interface CreateOrderInput {
     city: string;
     postalCode?: string;
   };
-  paymentMethod: string;
+  shippingMethodId: string;
+  items?: unknown[];
+  shippingCost?: number;
+  subtotal?: number;
+  discountAmount?: number;
+  couponId?: string;
+  couponCode?: string;
+  total?: number;
+  paymentMethod?: string;
 }
 
 interface OrderResult {
@@ -29,83 +29,60 @@ interface OrderResult {
 }
 
 export const useCreateOrder = () => {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: CreateOrderInput): Promise<OrderResult> => {
-      // Create the order
-      const orderData = {
-        user_id: user?.id || null,
-        guest_email: !user ? input.shippingDetails.email : null,
-        status: 'pending' as const,
-        payment_status: 'pending' as const,
-        subtotal: input.subtotal,
-        shipping_cost: input.shippingCost,
-        discount_amount: input.discountAmount || 0,
-        coupon_id: input.couponId || null,
-        coupon_code: input.couponCode || null,
-        total: input.total,
-        shipping_method_id: input.shippingMethodId,
-        shipping_first_name: input.shippingDetails.firstName,
-        shipping_last_name: input.shippingDetails.lastName,
-        shipping_phone: input.shippingDetails.phone,
-        shipping_street: input.shippingDetails.street,
-        shipping_city: input.shippingDetails.city,
-        shipping_postal_code: input.shippingDetails.postalCode || null,
-        payment_method: input.paymentMethod,
-        order_number: `ORD-${Date.now()}`, // Will be overwritten by trigger
-      };
+      const cartId = getCartId();
+      if (!cartId) throw new Error('No cart found');
 
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert(orderData)
-        .select('id, order_number')
-        .single();
-
-      if (orderError) {
-        console.error('Order creation error:', orderError);
-        throw new Error('שגיאה ביצירת ההזמנה');
-      }
-
-      // Create order items
-      const orderItems = input.items.map((item) => {
-        const price = item.variation?.sale_price || item.variation?.price ||
-          item.product.sale_price || item.product.price;
-        
-        // Get variant name from attributes if exists
-        const variantName = item.variation?.attributes 
-          ? Object.values(item.variation.attributes).join(' / ') 
-          : null;
-        
-        return {
-          order_id: order.id,
-          product_id: item.product.id,
-          product_title: item.product.name,
-          variant_id: item.variation?.id || null,
-          variant_name: variantName,
-          quantity: item.quantity,
-          unit_price: price,
-          total_price: price * item.quantity,
-        };
+      // 1. Update cart with email and shipping address
+      await medusa.store.cart.update(cartId, {
+        email: input.email,
+        shipping_address: {
+          first_name: input.shippingDetails.firstName,
+          last_name: input.shippingDetails.lastName,
+          address_1: input.shippingDetails.street,
+          city: input.shippingDetails.city,
+          country_code: 'il', // Israel
+          postal_code: input.shippingDetails.postalCode || '',
+          phone: input.shippingDetails.phone,
+        },
       });
 
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
-
-      if (itemsError) {
-        console.error('Order items creation error:', itemsError);
-        throw new Error('שגיאה בשמירת פריטי ההזמנה');
+      // 2. Add shipping method if provided
+      if (input.shippingMethodId) {
+        await medusa.store.cart.addShippingMethod(cartId, {
+          option_id: input.shippingMethodId,
+        });
       }
 
+      // 3. Create payment sessions
+      await medusa.store.payment.initiatePaymentSession(cartId, {
+        provider_id: 'manual', // Use manual payment for now
+      });
+
+      // 4. Complete the cart (creates the order)
+      const { type, order } = await medusa.store.cart.complete(cartId);
+      
+      if (type !== 'order' || !order) {
+        throw new Error('Failed to create order');
+      }
+
+      const medusaOrder = order as MedusaOrder;
+
+      // 5. Clear cart ID (new cart will be created on next add)
+      clearCartId();
+
       return {
-        orderId: order.id,
-        orderNumber: order.order_number,
+        orderId: medusaOrder.id,
+        orderNumber: `ORD-${medusaOrder.display_id}`,
       };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
+      // Invalidate cart query to refresh
+      queryClient.invalidateQueries({ queryKey: ['medusa-cart'] });
+      queryClient.invalidateQueries({ queryKey: ['user-orders'] });
     },
   });
 };

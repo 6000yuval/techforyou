@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { medusa } from '@/integrations/medusa/client';
 import { useAuth } from '@/contexts/AuthContext';
+import type { MedusaOrder, MedusaLineItem } from '@/integrations/medusa/types';
 
 interface OrderItem {
   id: string;
@@ -10,6 +11,7 @@ interface OrderItem {
   quantity: number;
   unit_price: number;
   total_price: number;
+  thumbnail: string | null;
 }
 
 interface Order {
@@ -28,45 +30,69 @@ interface Order {
   order_items: OrderItem[];
 }
 
+// Transform Medusa order to app format
+const transformOrder = (medusaOrder: MedusaOrder): Order => {
+  return {
+    id: medusaOrder.id,
+    order_number: `ORD-${medusaOrder.display_id}`,
+    status: medusaOrder.status,
+    payment_status: medusaOrder.payment_status,
+    subtotal: medusaOrder.subtotal / 100,
+    shipping_cost: medusaOrder.shipping_total / 100,
+    discount_amount: medusaOrder.discount_total / 100,
+    total: medusaOrder.total / 100,
+    created_at: medusaOrder.created_at,
+    shipping_first_name: medusaOrder.shipping_address?.first_name || '',
+    shipping_last_name: medusaOrder.shipping_address?.last_name || '',
+    shipping_city: medusaOrder.shipping_address?.city || '',
+    order_items: medusaOrder.items.map((item: MedusaLineItem) => ({
+      id: item.id,
+      product_id: item.product?.id || '',
+      product_title: item.title,
+      variant_name: item.variant?.title || null,
+      quantity: item.quantity,
+      unit_price: item.unit_price / 100,
+      total_price: item.total / 100,
+      thumbnail: item.thumbnail,
+    })),
+  };
+};
+
 export function useUserOrders() {
   const { user } = useAuth();
 
   return useQuery({
     queryKey: ['user-orders', user?.id],
-    queryFn: async () => {
+    queryFn: async (): Promise<Order[]> => {
       if (!user) return [];
 
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          id,
-          order_number,
-          status,
-          payment_status,
-          subtotal,
-          shipping_cost,
-          discount_amount,
-          total,
-          created_at,
-          shipping_first_name,
-          shipping_last_name,
-          shipping_city,
-          order_items (
-            id,
-            product_id,
-            product_title,
-            variant_name,
-            quantity,
-            unit_price,
-            total_price
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data as Order[];
+      try {
+        const { orders } = await medusa.store.order.list();
+        return (orders as MedusaOrder[] || []).map(transformOrder);
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        return [];
+      }
     },
     enabled: !!user,
+  });
+}
+
+// Get single order by ID
+export function useOrder(orderId: string) {
+  return useQuery({
+    queryKey: ['order', orderId],
+    queryFn: async (): Promise<Order | null> => {
+      if (!orderId) return null;
+
+      try {
+        const { order } = await medusa.store.order.retrieve(orderId);
+        return transformOrder(order as MedusaOrder);
+      } catch (error) {
+        console.error('Error fetching order:', error);
+        return null;
+      }
+    },
+    enabled: !!orderId,
   });
 }

@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { medusa, getCartId } from '@/integrations/medusa/client';
+import type { MedusaCart } from '@/integrations/medusa/types';
 
 interface Coupon {
   id: string;
@@ -16,12 +18,50 @@ interface UseCouponReturn {
   validateCoupon: (code: string, orderTotal: number) => Promise<boolean>;
   clearCoupon: () => void;
   calculateDiscount: (subtotal: number) => number;
+  appliedDiscountCode: string | null;
 }
 
 export function useCoupon(): UseCouponReturn {
   const [coupon, setCoupon] = useState<Coupon | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [appliedDiscountCode, setAppliedDiscountCode] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  // Apply discount code to cart
+  const applyDiscount = useMutation({
+    mutationFn: async (code: string) => {
+      const cartId = getCartId();
+      if (!cartId) throw new Error('No cart found');
+      
+      const { cart } = await medusa.store.cart.update(cartId, {
+        promo_codes: [code],
+      });
+      
+      return cart as MedusaCart;
+    },
+    onSuccess: (cart) => {
+      queryClient.setQueryData(['medusa-cart'], cart);
+    },
+  });
+
+  // Remove discount code from cart
+  const removeDiscount = useMutation({
+    mutationFn: async (code: string) => {
+      const cartId = getCartId();
+      if (!cartId) throw new Error('No cart found');
+      
+      // Remove the promo code
+      const { cart } = await medusa.store.cart.update(cartId, {
+        promo_codes: [],
+      });
+      
+      return cart as MedusaCart;
+    },
+    onSuccess: (cart) => {
+      queryClient.setQueryData(['medusa-cart'], cart);
+    },
+  });
 
   const validateCoupon = async (code: string, orderTotal: number): Promise<boolean> => {
     if (!code.trim()) {
@@ -33,78 +73,44 @@ export function useCoupon(): UseCouponReturn {
     setError(null);
 
     try {
-      const { data, error: fetchError } = await supabase
-        .from('coupons')
-        .select('*')
-        .eq('code', code.toUpperCase())
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (fetchError) throw fetchError;
-
-      if (!data) {
-        setError('קופון לא נמצא או לא פעיל');
-        setCoupon(null);
-        return false;
-      }
-
-      // Check validity dates
-      if (data.valid_from && new Date(data.valid_from) > new Date()) {
-        setError('הקופון עדיין לא בתוקף');
-        setCoupon(null);
-        return false;
-      }
-
-      if (data.valid_until && new Date(data.valid_until) < new Date()) {
-        setError('תוקף הקופון פג');
-        setCoupon(null);
-        return false;
-      }
-
-      // Check max uses
-      if (data.max_uses && data.current_uses >= data.max_uses) {
-        setError('הקופון מוצה');
-        setCoupon(null);
-        return false;
-      }
-
-      // Check minimum order amount
-      if (data.minimum_order_amount && orderTotal < data.minimum_order_amount) {
-        setError(`מינימום הזמנה לקופון: ₪${data.minimum_order_amount}`);
-        setCoupon(null);
-        return false;
-      }
-
+      await applyDiscount.mutateAsync(code.toUpperCase());
+      
+      // If we get here, the discount was applied successfully
       setCoupon({
-        id: data.id,
-        code: data.code,
-        discount_type: data.discount_type,
-        discount_value: data.discount_value,
-        minimum_order_amount: data.minimum_order_amount,
+        id: code,
+        code: code.toUpperCase(),
+        discount_type: 'fixed', // Will be calculated by Medusa
+        discount_value: 0, // Will be calculated by Medusa
+        minimum_order_amount: null,
       });
+      setAppliedDiscountCode(code.toUpperCase());
       return true;
     } catch (err) {
       console.error('Coupon validation error:', err);
-      setError('שגיאה בבדיקת הקופון');
+      setError('קופון לא נמצא או לא פעיל');
+      setCoupon(null);
       return false;
     } finally {
       setIsValidating(false);
     }
   };
 
-  const clearCoupon = () => {
+  const clearCoupon = async () => {
+    if (appliedDiscountCode) {
+      try {
+        await removeDiscount.mutateAsync(appliedDiscountCode);
+      } catch (err) {
+        console.error('Error removing discount:', err);
+      }
+    }
     setCoupon(null);
+    setAppliedDiscountCode(null);
     setError(null);
   };
 
   const calculateDiscount = (subtotal: number): number => {
-    if (!coupon) return 0;
-
-    if (coupon.discount_type === 'percentage') {
-      return (subtotal * coupon.discount_value) / 100;
-    } else if (coupon.discount_type === 'fixed') {
-      return Math.min(coupon.discount_value, subtotal);
-    }
+    // Discount is calculated by Medusa and reflected in cart totals
+    // This function is kept for API compatibility
     return 0;
   };
 
@@ -115,5 +121,6 @@ export function useCoupon(): UseCouponReturn {
     validateCoupon,
     clearCoupon,
     calculateDiscount,
+    appliedDiscountCode,
   };
 }

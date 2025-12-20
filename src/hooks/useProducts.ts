@@ -1,289 +1,128 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { medusa, getRegionId, setRegionId } from '@/integrations/medusa/client';
+import { transformMedusaProduct } from '@/integrations/medusa/transforms';
 import type { Product } from '@/types';
+import type { MedusaProduct } from '@/integrations/medusa/types';
 
-interface DBProduct {
-  id: string;
-  name: string;
-  slug: string;
-  short_description: string | null;
-  description: string | null;
-  price: number;
-  compare_at_price: number | null;
-  category_id: string | null;
-  subcategory_id: string | null;
-  attributes: Record<string, unknown> | null;
-  is_featured: boolean | null;
-  is_active: boolean | null;
-  created_at: string | null;
-}
-
-interface DBProductImage {
-  url: string;
-  is_primary: boolean | null;
-}
-
-interface DBInventory {
-  quantity: number | null;
-}
-
-interface DBAttribute {
-  name: string;
-  values: string[];
-}
-
-// Transform DB product to frontend Product type
-const transformProduct = (
-  dbProduct: DBProduct, 
-  images: DBProductImage[], 
-  inventory: DBInventory | null,
-  categoryName?: string
-): Product => {
-  // Sort images - primary first
-  const sortedImages = [...images].sort((a, b) => {
-    if (a.is_primary && !b.is_primary) return -1;
-    if (!a.is_primary && b.is_primary) return 1;
-    return 0;
-  });
-
-  // Parse attributes from JSON - DB stores as array of {name, values}
-  const rawAttributes = dbProduct.attributes;
-  let productAttributes: { name: string; values: string[] }[] = [];
-  
-  if (Array.isArray(rawAttributes)) {
-    productAttributes = (rawAttributes as DBAttribute[]).map(attr => ({
-      name: attr.name || '',
-      values: Array.isArray(attr.values) ? attr.values : []
-    }));
+// Helper to ensure we have a region ID
+const ensureRegionId = async (): Promise<string> => {
+  let regionId = getRegionId();
+  if (!regionId) {
+    // Fetch regions and use the first one (should be Israel)
+    const { regions } = await medusa.store.region.list();
+    if (regions && regions.length > 0) {
+      regionId = regions[0].id;
+      setRegionId(regionId);
+    } else {
+      throw new Error('No regions configured in Medusa');
+    }
   }
-
-  return {
-    id: dbProduct.id,
-    name: dbProduct.name,
-    slug: dbProduct.slug,
-    short_description: dbProduct.short_description || undefined,
-    description: dbProduct.description || undefined,
-    price: dbProduct.compare_at_price || dbProduct.price,
-    sale_price: dbProduct.compare_at_price ? dbProduct.price : undefined,
-    images: sortedImages.map(img => img.url),
-    category_id: dbProduct.category_id || '',
-    category_name: categoryName,
-    in_stock: (inventory?.quantity ?? 0) > 0,
-    stock_quantity: inventory?.quantity ?? 0,
-    attributes: productAttributes,
-    created_at: dbProduct.created_at || undefined,
-  };
-};
-
-// Category name mapping
-const categoryNames: Record<string, string> = {
-  headphones: 'אוזניות',
-  microphones: 'מיקרופונים',
-  speakers: 'רמקולים',
-  cameras: 'מצלמות',
-  mice: 'עכברים',
-  keyboards: 'מקלדות',
-  'computer-sets': 'סטים למחשב',
-  cables: 'כבלים',
-  adapters: 'מתאמים',
-  'hubs-docking': 'Hubs ותחנות עגינה',
-  storage: 'אחסון חיצוני',
-  'external-storage': 'אחסון חיצוני',
-  network: 'רשת',
-  networking: 'רשת',
-  'desk-setup': 'ארגון שולחן וסטאפ',
-  'desk-organization': 'ארגון שולחן וסטאפ',
-  'power-charging': 'חשמל וטעינה',
-  gaming: 'גיימינג',
+  return regionId;
 };
 
 // Fetch all products
 export const useProducts = () => {
   return useQuery({
     queryKey: ['products'],
-    queryFn: async () => {
-      // Fetch products
-      const { data: products, error: productsError } = await supabase
-        .from('products')
-        .select('*')
-        .eq('is_active', true);
+    queryFn: async (): Promise<Product[]> => {
+      const regionId = await ensureRegionId();
+      
+      const { products } = await medusa.store.product.list({
+        region_id: regionId,
+        fields: '+variants.calculated_price,+variants.inventory_quantity',
+        limit: 100,
+      });
 
-      if (productsError) throw productsError;
-
-      // Fetch all images
-      const { data: allImages, error: imagesError } = await supabase
-        .from('product_images')
-        .select('product_id, url, is_primary');
-
-      if (imagesError) throw imagesError;
-
-      // Fetch all inventory
-      const { data: allInventory, error: inventoryError } = await supabase
-        .from('inventory')
-        .select('product_id, quantity');
-
-      if (inventoryError) throw inventoryError;
-
-      // Group images and inventory by product_id
-      const imagesByProduct = (allImages || []).reduce((acc, img) => {
-        if (!acc[img.product_id]) acc[img.product_id] = [];
-        acc[img.product_id].push({ url: img.url, is_primary: img.is_primary });
-        return acc;
-      }, {} as Record<string, DBProductImage[]>);
-
-      const inventoryByProduct = (allInventory || []).reduce((acc, inv) => {
-        acc[inv.product_id] = { quantity: inv.quantity };
-        return acc;
-      }, {} as Record<string, DBInventory>);
-
-      // Transform products
-      return (products || []).map(p => 
-        transformProduct(
-          p as unknown as DBProduct,
-          imagesByProduct[p.id] || [],
-          inventoryByProduct[p.id] || null,
-          categoryNames[p.category_id || '']
-        )
-      );
+      return (products as MedusaProduct[] || []).map(transformMedusaProduct);
     },
   });
 };
 
-// Fetch single product by slug
+// Fetch single product by slug (handle)
 export const useProduct = (slug: string) => {
   return useQuery({
     queryKey: ['product', slug],
-    queryFn: async () => {
-      const { data: product, error: productError } = await supabase
-        .from('products')
-        .select('*')
-        .eq('slug', slug)
-        .eq('is_active', true)
-        .maybeSingle();
+    queryFn: async (): Promise<Product | null> => {
+      const regionId = await ensureRegionId();
+      
+      const { products } = await medusa.store.product.list({
+        handle: slug,
+        region_id: regionId,
+        fields: '+variants.calculated_price,+variants.inventory_quantity',
+      });
 
-      if (productError) throw productError;
-      if (!product) return null;
-
-      // Fetch images
-      const { data: images } = await supabase
-        .from('product_images')
-        .select('url, is_primary')
-        .eq('product_id', product.id);
-
-      // Fetch inventory
-      const { data: inventory } = await supabase
-        .from('inventory')
-        .select('quantity')
-        .eq('product_id', product.id)
-        .maybeSingle();
-
-      return transformProduct(
-        product as unknown as DBProduct,
-        (images || []) as DBProductImage[],
-        inventory as DBInventory | null,
-        categoryNames[product.category_id || '']
-      );
+      if (!products || products.length === 0) return null;
+      return transformMedusaProduct(products[0] as MedusaProduct);
     },
     enabled: !!slug,
   });
 };
 
 // Fetch products by category
-export const useProductsByCategory = (categoryId: string) => {
+export const useProductsByCategory = (categoryHandle: string) => {
   return useQuery({
-    queryKey: ['products', 'category', categoryId],
-    queryFn: async () => {
-      const { data: products, error: productsError } = await supabase
-        .from('products')
-        .select('*')
-        .eq('category_id', categoryId)
-        .eq('is_active', true);
-
-      if (productsError) throw productsError;
-
-      // Fetch images for these products
-      const productIds = (products || []).map(p => p.id);
+    queryKey: ['products', 'category', categoryHandle],
+    queryFn: async (): Promise<Product[]> => {
+      const regionId = await ensureRegionId();
       
-      const { data: allImages } = await supabase
-        .from('product_images')
-        .select('product_id, url, is_primary')
-        .in('product_id', productIds);
+      // First get the category ID from handle
+      const { product_categories } = await medusa.store.category.list({
+        handle: categoryHandle,
+      });
+      
+      if (!product_categories || product_categories.length === 0) {
+        return [];
+      }
+      
+      const categoryId = product_categories[0].id;
+      
+      const { products } = await medusa.store.product.list({
+        category_id: [categoryId],
+        region_id: regionId,
+        fields: '+variants.calculated_price,+variants.inventory_quantity',
+        limit: 100,
+      });
 
-      const { data: allInventory } = await supabase
-        .from('inventory')
-        .select('product_id, quantity')
-        .in('product_id', productIds);
-
-      // Group by product_id
-      const imagesByProduct = (allImages || []).reduce((acc, img) => {
-        if (!acc[img.product_id]) acc[img.product_id] = [];
-        acc[img.product_id].push({ url: img.url, is_primary: img.is_primary });
-        return acc;
-      }, {} as Record<string, DBProductImage[]>);
-
-      const inventoryByProduct = (allInventory || []).reduce((acc, inv) => {
-        acc[inv.product_id] = { quantity: inv.quantity };
-        return acc;
-      }, {} as Record<string, DBInventory>);
-
-      return (products || []).map(p => 
-        transformProduct(
-          p as unknown as DBProduct,
-          imagesByProduct[p.id] || [],
-          inventoryByProduct[p.id] || null,
-          categoryNames[categoryId]
-        )
-      );
+      return (products as MedusaProduct[] || []).map(transformMedusaProduct);
     },
-    enabled: !!categoryId,
+    enabled: !!categoryHandle,
   });
 };
 
-// Fetch featured products
+// Fetch featured products (using collection or tag)
 export const useFeaturedProducts = () => {
   return useQuery({
     queryKey: ['products', 'featured'],
-    queryFn: async () => {
-      const { data: products, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('is_active', true)
-        .eq('is_featured', true)
-        .limit(8);
-
-      if (error) throw error;
-
-      const productIds = (products || []).map(p => p.id);
+    queryFn: async (): Promise<Product[]> => {
+      const regionId = await ensureRegionId();
       
-      const { data: allImages } = await supabase
-        .from('product_images')
-        .select('product_id, url, is_primary')
-        .in('product_id', productIds);
+      // Try to get products from "featured" collection
+      try {
+        const { collections } = await medusa.store.collection.list({
+          handle: 'featured',
+        });
+        
+        if (collections && collections.length > 0) {
+          const { products } = await medusa.store.product.list({
+            collection_id: [collections[0].id],
+            region_id: regionId,
+            fields: '+variants.calculated_price,+variants.inventory_quantity',
+            limit: 8,
+          });
+          return (products as MedusaProduct[] || []).map(transformMedusaProduct);
+        }
+      } catch {
+        // Collection doesn't exist, fall back to regular products
+      }
+      
+      // Fallback: return first 8 products
+      const { products } = await medusa.store.product.list({
+        region_id: regionId,
+        fields: '+variants.calculated_price,+variants.inventory_quantity',
+        limit: 8,
+      });
 
-      const { data: allInventory } = await supabase
-        .from('inventory')
-        .select('product_id, quantity')
-        .in('product_id', productIds);
-
-      const imagesByProduct = (allImages || []).reduce((acc, img) => {
-        if (!acc[img.product_id]) acc[img.product_id] = [];
-        acc[img.product_id].push({ url: img.url, is_primary: img.is_primary });
-        return acc;
-      }, {} as Record<string, DBProductImage[]>);
-
-      const inventoryByProduct = (allInventory || []).reduce((acc, inv) => {
-        acc[inv.product_id] = { quantity: inv.quantity };
-        return acc;
-      }, {} as Record<string, DBInventory>);
-
-      return (products || []).map(p => 
-        transformProduct(
-          p as unknown as DBProduct,
-          imagesByProduct[p.id] || [],
-          inventoryByProduct[p.id] || null,
-          categoryNames[p.category_id || '']
-        )
-      );
+      return (products as MedusaProduct[] || []).map(transformMedusaProduct);
     },
   });
 };
@@ -292,47 +131,45 @@ export const useFeaturedProducts = () => {
 export const useProductsOnSale = () => {
   return useQuery({
     queryKey: ['products', 'on-sale'],
-    queryFn: async () => {
-      const { data: products, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('is_active', true)
-        .not('compare_at_price', 'is', null)
-        .limit(8);
-
-      if (error) throw error;
-
-      const productIds = (products || []).map(p => p.id);
+    queryFn: async (): Promise<Product[]> => {
+      const regionId = await ensureRegionId();
       
-      const { data: allImages } = await supabase
-        .from('product_images')
-        .select('product_id, url, is_primary')
-        .in('product_id', productIds);
+      // Try to get products from "sale" collection
+      try {
+        const { collections } = await medusa.store.collection.list({
+          handle: 'sale',
+        });
+        
+        if (collections && collections.length > 0) {
+          const { products } = await medusa.store.product.list({
+            collection_id: [collections[0].id],
+            region_id: regionId,
+            fields: '+variants.calculated_price,+variants.inventory_quantity',
+            limit: 8,
+          });
+          return (products as MedusaProduct[] || []).map(transformMedusaProduct);
+        }
+      } catch {
+        // Collection doesn't exist
+      }
+      
+      // Fallback: get all products and filter those with calculated discounts
+      const { products } = await medusa.store.product.list({
+        region_id: regionId,
+        fields: '+variants.calculated_price,+variants.inventory_quantity',
+        limit: 50,
+      });
 
-      const { data: allInventory } = await supabase
-        .from('inventory')
-        .select('product_id, quantity')
-        .in('product_id', productIds);
+      const saleProducts = (products as MedusaProduct[] || [])
+        .filter(p => {
+          const variant = p.variants?.[0];
+          const calc = variant?.calculated_price;
+          return calc && calc.calculated_amount < calc.original_amount;
+        })
+        .slice(0, 8)
+        .map(transformMedusaProduct);
 
-      const imagesByProduct = (allImages || []).reduce((acc, img) => {
-        if (!acc[img.product_id]) acc[img.product_id] = [];
-        acc[img.product_id].push({ url: img.url, is_primary: img.is_primary });
-        return acc;
-      }, {} as Record<string, DBProductImage[]>);
-
-      const inventoryByProduct = (allInventory || []).reduce((acc, inv) => {
-        acc[inv.product_id] = { quantity: inv.quantity };
-        return acc;
-      }, {} as Record<string, DBInventory>);
-
-      return (products || []).map(p => 
-        transformProduct(
-          p as unknown as DBProduct,
-          imagesByProduct[p.id] || [],
-          inventoryByProduct[p.id] || null,
-          categoryNames[p.category_id || '']
-        )
-      );
+      return saleProducts;
     },
   });
 };
@@ -341,51 +178,19 @@ export const useProductsOnSale = () => {
 export const useSearchProducts = (query: string) => {
   return useQuery({
     queryKey: ['products', 'search', query],
-    queryFn: async () => {
+    queryFn: async (): Promise<Product[]> => {
       if (!query.trim()) return [];
 
-      // Sanitize query to escape SQL LIKE special characters
-      const sanitizedQuery = query.replace(/[%_\\]/g, '\\$&');
-
-      const { data: products, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('is_active', true)
-        .or(`name.ilike.%${sanitizedQuery}%,short_description.ilike.%${sanitizedQuery}%,description.ilike.%${sanitizedQuery}%`);
-
-      if (error) throw error;
-
-      const productIds = (products || []).map(p => p.id);
+      const regionId = await ensureRegionId();
       
-      const { data: allImages } = await supabase
-        .from('product_images')
-        .select('product_id, url, is_primary')
-        .in('product_id', productIds);
+      const { products } = await medusa.store.product.list({
+        q: query,
+        region_id: regionId,
+        fields: '+variants.calculated_price,+variants.inventory_quantity',
+        limit: 50,
+      });
 
-      const { data: allInventory } = await supabase
-        .from('inventory')
-        .select('product_id, quantity')
-        .in('product_id', productIds);
-
-      const imagesByProduct = (allImages || []).reduce((acc, img) => {
-        if (!acc[img.product_id]) acc[img.product_id] = [];
-        acc[img.product_id].push({ url: img.url, is_primary: img.is_primary });
-        return acc;
-      }, {} as Record<string, DBProductImage[]>);
-
-      const inventoryByProduct = (allInventory || []).reduce((acc, inv) => {
-        acc[inv.product_id] = { quantity: inv.quantity };
-        return acc;
-      }, {} as Record<string, DBInventory>);
-
-      return (products || []).map(p => 
-        transformProduct(
-          p as unknown as DBProduct,
-          imagesByProduct[p.id] || [],
-          inventoryByProduct[p.id] || null,
-          categoryNames[p.category_id || '']
-        )
-      );
+      return (products as MedusaProduct[] || []).map(transformMedusaProduct);
     },
     enabled: !!query.trim(),
   });

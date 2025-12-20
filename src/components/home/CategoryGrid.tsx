@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
-import { categories } from '@/hooks/useCategories';
+import { useCategories, getCategoryIcon } from '@/hooks/useCategories';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // Category images mapping - accurate images for each category
 const categoryImages: Record<string, string> = {
@@ -23,6 +24,23 @@ const categoryImages: Record<string, string> = {
 };
 
 const CategoryGrid: React.FC = () => {
+  const { data: categories, isLoading } = useCategories();
+
+  if (isLoading) {
+    return (
+      <section id="categories-section" className="py-12 bg-background">
+        <div className="container">
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-8 text-center">קטגוריות</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {[...Array(10)].map((_, i) => (
+              <Skeleton key={i} className="aspect-square rounded-lg" />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section id="categories-section" className="py-12 bg-background">
       <div className="container">
@@ -30,7 +48,7 @@ const CategoryGrid: React.FC = () => {
           קטגוריות
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {categories.slice(0, 15).map((category) => {
+          {(categories || []).slice(0, 15).map((category) => {
             const imageUrl = categoryImages[category.slug] || 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&h=300&fit=crop';
             
             return (
