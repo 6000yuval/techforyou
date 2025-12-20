@@ -10,7 +10,7 @@ import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getCategoryBySlug, getParentCategory, mapDbCategoryId } from '@/hooks/useCategories';
+import { useCategories, getCategoryBySlug, getParentCategorySync } from '@/hooks/useCategories';
 import { useProducts } from '@/hooks/useProducts';
 import { productBelongsToSubcategory } from '@/utils/productSubcategoryMatcher';
 
@@ -28,8 +28,9 @@ const ProductGridSkeleton = () => (
 
 const CategoryPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
-  const category = getCategoryBySlug(slug || '');
-  const parentCategory = getParentCategory(slug || '');
+  const { data: categories = [] } = useCategories();
+  const category = getCategoryBySlug(slug || '', categories);
+  const parentCategory = getParentCategorySync(slug || '', categories);
   
   const { data: allProducts, isLoading } = useProducts();
   
@@ -46,15 +47,13 @@ const CategoryPage: React.FC = () => {
     // If we're on a subcategory page
     if (parentCategory) {
       return allProducts.filter(p => {
-        const mappedCategoryId = mapDbCategoryId(p.category_id);
-        return mappedCategoryId === parentCategory.id && 
+        return p.category_id === parentCategory.id && 
           productBelongsToSubcategory(p, slug || '');
       });
     }
     // If we're on a main category page, show all products from that category
     return allProducts.filter(p => {
-      const mappedCategoryId = mapDbCategoryId(p.category_id);
-      return mappedCategoryId === category?.id;
+      return p.category_id === category?.id;
     });
   }, [allProducts, category, parentCategory, slug]);
 

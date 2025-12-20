@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCart } from '@/contexts/CartContext';
 import { useProduct, useProducts } from '@/hooks/useProducts';
-import { getCategoryBySlug } from '@/hooks/useCategories';
+import { useCategories, getCategoryBySlug } from '@/hooks/useCategories';
 import { toast } from 'sonner';
 
 const ProductPageSkeleton = () => (
@@ -42,6 +42,7 @@ const ProductPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const { data: product, isLoading } = useProduct(slug || '');
   const { data: allProducts } = useProducts();
+  const { data: categories = [] } = useCategories();
   const { addItem } = useCart();
   
   const [quantity, setQuantity] = useState(1);
@@ -71,7 +72,7 @@ const ProductPage: React.FC = () => {
     );
   }
 
-  const category = getCategoryBySlug(product.category_id);
+  const category = getCategoryBySlug(product.category_id, categories);
   const hasDiscount = product.sale_price && product.sale_price < product.price;
   const discountPercent = hasDiscount
     ? Math.round((1 - product.sale_price! / product.price) * 100)
