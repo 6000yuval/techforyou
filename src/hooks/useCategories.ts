@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { medusa } from '@/integrations/medusa/client';
+import { medusa, isDemoMode } from '@/integrations/medusa/client';
 import { transformMedusaCategory } from '@/integrations/medusa/transforms';
+import { categories as mockCategories } from '@/data/categories';
 import type { Category } from '@/types';
 import type { MedusaCategory } from '@/integrations/medusa/types';
 
@@ -9,6 +10,11 @@ export const useCategories = () => {
   return useQuery({
     queryKey: ['categories'],
     queryFn: async (): Promise<Category[]> => {
+      // Demo mode - return mock data
+      if (isDemoMode) {
+        return mockCategories;
+      }
+
       const { product_categories } = await medusa.store.category.list({
         include_descendants_tree: true,
       });
@@ -29,6 +35,11 @@ export const useCategoryBySlug = (slug: string) => {
   return useQuery({
     queryKey: ['category', slug],
     queryFn: async (): Promise<Category | null> => {
+      // Demo mode - return mock data
+      if (isDemoMode) {
+        return getCategoryBySlug(slug, mockCategories) || null;
+      }
+
       const { product_categories } = await medusa.store.category.list({
         handle: slug,
         include_descendants_tree: true,
