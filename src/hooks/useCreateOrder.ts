@@ -38,7 +38,7 @@ export const useCreateOrder = () => {
 
       // 1. Update cart with email and shipping address
       await medusa.store.cart.update(cartId, {
-        email: input.email,
+        email: input.shippingDetails.email,
         shipping_address: {
           first_name: input.shippingDetails.firstName,
           last_name: input.shippingDetails.lastName,
